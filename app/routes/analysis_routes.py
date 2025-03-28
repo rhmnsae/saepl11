@@ -37,10 +37,23 @@ def save_to_database(title, description, file_path, output_file, analysis_data, 
     if not current_user.is_authenticated:
         return False
 
-    # Validasi file hasil analisis
-    if not output_file or not os.path.exists(output_file):
-        print(f"Error: File hasil analisis tidak ditemukan: {output_file}")
+    # Validasi file hasil analisis dengan error handling yang lebih baik
+    if not output_file:
+        print(f"Error: Nama output file kosong")
         return False
+        
+    if not os.path.exists(output_file):
+        print(f"Error: File hasil analisis tidak ditemukan: {output_file}")
+        # Coba cari file dengan nama serupa
+        upload_dir = current_app.config['UPLOAD_FOLDER']
+        filename = os.path.basename(output_file)
+        alternative_path = os.path.join(upload_dir, filename)
+        
+        if os.path.exists(alternative_path):
+            print(f"Ditemukan file alternatif: {alternative_path}")
+            output_file = alternative_path
+        else:
+            return False
         
     # Validasi ukuran file
     try:
@@ -52,118 +65,146 @@ def save_to_database(title, description, file_path, output_file, analysis_data, 
         print(f"Error memeriksa file: {str(e)}")
         return False
 
-    # Extract required data dengan nilai default
-    positive_count = analysis_data.get('positive_count', 0)
-    neutral_count = analysis_data.get('neutral_count', 0)
-    negative_count = analysis_data.get('negative_count', 0)
-    total_tweets = analysis_data.get('total_tweets', 0)
-    positive_percent = analysis_data.get('positive_percent', 0)
-    neutral_percent = analysis_data.get('neutral_percent', 0)
-    negative_percent = analysis_data.get('negative_percent', 0)
-    top_hashtags = analysis_data.get('top_hashtags', [])
-    topics = analysis_data.get('topics', [])
-
-    # Pastikan nilai numerik valid
-    if not isinstance(positive_count, (int, float)) or positive_count < 0:
-        positive_count = 0
-    if not isinstance(neutral_count, (int, float)) or neutral_count < 0:
-        neutral_count = 0
-    if not isinstance(negative_count, (int, float)) or negative_count < 0:
-        negative_count = 0
-    if not isinstance(total_tweets, (int, float)) or total_tweets < 0:
-        total_tweets = 0
+    # Extract required data dengan nilai default dan validasi
+    try:
+        positive_count = analysis_data.get('positive_count', 0)
+        neutral_count = analysis_data.get('neutral_count', 0)
+        negative_count = analysis_data.get('negative_count', 0)
+        total_tweets = analysis_data.get('total_tweets', 0)
+        positive_percent = analysis_data.get('positive_percent', 0)
+        neutral_percent = analysis_data.get('neutral_percent', 0)
+        negative_percent = analysis_data.get('negative_percent', 0)
+        top_hashtags = analysis_data.get('top_hashtags', [])
+        topics = analysis_data.get('topics', [])
         
-    # Validasi persentase
-    if not isinstance(positive_percent, (int, float)) or positive_percent < 0 or positive_percent > 100:
-        positive_percent = 0
-    if not isinstance(neutral_percent, (int, float)) or neutral_percent < 0 or neutral_percent > 100:
-        neutral_percent = 0
-    if not isinstance(negative_percent, (int, float)) or negative_percent < 0 or negative_percent > 100:
-        negative_percent = 0
-
-    # Convert hashtags to proper format dengan validasi
-    hashtags_json = "[]"
-    try:
-        if top_hashtags and isinstance(top_hashtags, list):
-            formatted_hashtags = []
-            for h in top_hashtags[:10]:  # Batasi ke 10 hashtag teratas
-                if isinstance(h, dict) and 'tag' in h:
-                    formatted_hashtags.append(h['tag'])
-                elif isinstance(h, str):
-                    formatted_hashtags.append(h)
-            hashtags_json = json.dumps(formatted_hashtags)
-    except Exception as e:
-        print(f"Error processing hashtags: {str(e)}")
+        # Pastikan nilai numerik valid
+        if not isinstance(positive_count, (int, float)) or positive_count < 0:
+            positive_count = 0
+        if not isinstance(neutral_count, (int, float)) or neutral_count < 0:
+            neutral_count = 0
+        if not isinstance(negative_count, (int, float)) or negative_count < 0:
+            negative_count = 0
+        if not isinstance(total_tweets, (int, float)) or total_tweets < 0:
+            total_tweets = 0
+            
+        # Validasi persentase
+        if not isinstance(positive_percent, (int, float)) or positive_percent < 0 or positive_percent > 100:
+            positive_percent = 0
+        if not isinstance(neutral_percent, (int, float)) or neutral_percent < 0 or neutral_percent > 100:
+            neutral_percent = 0
+        if not isinstance(negative_percent, (int, float)) or negative_percent < 0 or negative_percent > 100:
+            negative_percent = 0
+        
+        # Convert hashtags to proper format dengan validasi & penanganan error yang lebih baik
         hashtags_json = "[]"
-    
-    # Convert topics to proper format dengan validasi
-    topics_json = "[]"
-    try:
-        if topics and isinstance(topics, list):
-            formatted_topics = []
-            for t in topics[:10]:  # Batasi ke 10 topik teratas
-                if isinstance(t, dict) and 'topic' in t:
-                    formatted_topics.append(t['topic'])
-                elif isinstance(t, str):
-                    formatted_topics.append(t)
-            topics_json = json.dumps(formatted_topics)
-    except Exception as e:
-        print(f"Error processing topics: {str(e)}")
+        try:
+            if top_hashtags:
+                if isinstance(top_hashtags, list):
+                    formatted_hashtags = []
+                    for h in top_hashtags[:10]:  # Batasi ke 10 hashtag teratas
+                        if isinstance(h, dict) and 'tag' in h:
+                            formatted_hashtags.append(h['tag'])
+                        elif isinstance(h, str):
+                            formatted_hashtags.append(h)
+                    hashtags_json = json.dumps(formatted_hashtags)
+                elif isinstance(top_hashtags, str):
+                    # Jika sudah dalam bentuk JSON string, gunakan langsung
+                    try:
+                        # Validasi format JSON
+                        test_parse = json.loads(top_hashtags)
+                        hashtags_json = top_hashtags
+                    except:
+                        hashtags_json = "[]"
+        except Exception as e:
+            print(f"Error processing hashtags: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            hashtags_json = "[]"
+        
+        # Convert topics to proper format dengan validasi & penanganan error yang lebih baik
         topics_json = "[]"
-
-    # Check if analysis with the same title already exists for this user
-    existing_analysis = AnalysisHistory.query.filter_by(
-        user_id=current_user.id,
-        title=title
-    ).first()
-
-    try:
-        if existing_analysis:
-            # Update existing record
-            existing_analysis.description = description
-            existing_analysis.file_path = file_path
-            existing_analysis.result_file_path = output_file
-            existing_analysis.total_tweets = total_tweets
-            existing_analysis.positive_count = positive_count
-            existing_analysis.neutral_count = neutral_count
-            existing_analysis.negative_count = negative_count
-            existing_analysis.positive_percent = positive_percent
-            existing_analysis.neutral_percent = neutral_percent
-            existing_analysis.negative_percent = negative_percent
-            existing_analysis.top_hashtags = hashtags_json
-            existing_analysis.top_topics = topics_json
-            existing_analysis.sentiment_plot = sentiment_plot
-            existing_analysis.created_at = datetime.utcnow()
-        else:
-            # Create new record
-            new_analysis = AnalysisHistory(
-                title=title,
-                description=description,
-                file_path=file_path,
-                result_file_path=output_file,
-                total_tweets=total_tweets,
-                positive_count=positive_count,
-                neutral_count=neutral_count,
-                negative_count=negative_count,
-                positive_percent=positive_percent,
-                neutral_percent=neutral_percent,
-                negative_percent=negative_percent,
-                top_hashtags=hashtags_json,
-                top_topics=topics_json,
-                sentiment_plot=sentiment_plot,
-                user_id=current_user.id
-            )
-            db.session.add(new_analysis)
-
-        # Commit changes
-        db.session.commit()
-        print(f"Analysis '{title}' successfully saved to database")
-        return True
+        try:
+            if topics:
+                if isinstance(topics, list):
+                    formatted_topics = []
+                    for t in topics[:10]:  # Batasi ke 10 topik teratas
+                        if isinstance(t, dict) and 'topic' in t:
+                            formatted_topics.append(t['topic'])
+                        elif isinstance(t, str):
+                            formatted_topics.append(t)
+                    topics_json = json.dumps(formatted_topics)
+                elif isinstance(topics, str):
+                    # Jika sudah dalam bentuk JSON string, gunakan langsung
+                    try:
+                        # Validasi format JSON
+                        test_parse = json.loads(topics)
+                        topics_json = topics
+                    except:
+                        topics_json = "[]"
+        except Exception as e:
+            print(f"Error processing topics: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            topics_json = "[]"
+        
+        # Check if analysis with the same title already exists for this user
+        existing_analysis = AnalysisHistory.query.filter_by(
+            user_id=current_user.id,
+            title=title
+        ).first()
+        
+        try:
+            if existing_analysis:
+                # Update existing record
+                existing_analysis.description = description
+                existing_analysis.file_path = file_path
+                existing_analysis.result_file_path = output_file
+                existing_analysis.total_tweets = total_tweets
+                existing_analysis.positive_count = positive_count
+                existing_analysis.neutral_count = neutral_count
+                existing_analysis.negative_count = negative_count
+                existing_analysis.positive_percent = positive_percent
+                existing_analysis.neutral_percent = neutral_percent
+                existing_analysis.negative_percent = negative_percent
+                existing_analysis.top_hashtags = hashtags_json
+                existing_analysis.top_topics = topics_json
+                existing_analysis.sentiment_plot = sentiment_plot
+                existing_analysis.created_at = datetime.utcnow()
+            else:
+                # Create new record
+                new_analysis = AnalysisHistory(
+                    title=title,
+                    description=description,
+                    file_path=file_path,
+                    result_file_path=output_file,
+                    total_tweets=total_tweets,
+                    positive_count=positive_count,
+                    neutral_count=neutral_count,
+                    negative_count=negative_count,
+                    positive_percent=positive_percent,
+                    neutral_percent=neutral_percent,
+                    negative_percent=negative_percent,
+                    top_hashtags=hashtags_json,
+                    top_topics=topics_json,
+                    sentiment_plot=sentiment_plot,
+                    user_id=current_user.id
+                )
+                db.session.add(new_analysis)
+            
+            # Commit changes
+            db.session.commit()
+            print(f"Analysis '{title}' successfully saved to database")
+            return True
+        except Exception as e:
+            print(f"Error saving to database: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+            return False
     except Exception as e:
-        print(f"Error saving to database: {str(e)}")
+        print(f"Error preparing data for database: {str(e)}")
         import traceback
         traceback.print_exc()
-        db.session.rollback()
         return False
 
 @analysis_bp.route('/upload', methods=['POST'])

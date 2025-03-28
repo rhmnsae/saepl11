@@ -9,15 +9,17 @@ auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+    # Redirect ke halaman utama dengan view=login
+    if request.method == 'GET':
+        return redirect(url_for('main.index', view='login'))
     
+    # Handle POST request untuk login
     form = LoginForm()
     if form.validate_on_submit():
         user = User.query.filter_by(username=form.username.data).first()
         if user is None or not user.check_password(form.password.data):
             flash('Username atau password salah', 'danger')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('main.index', view='login'))
         
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
@@ -26,7 +28,11 @@ def login():
         flash(f'Selamat datang kembali, {user.username}!', 'success')
         return redirect(next_page)
     
-    return render_template('auth/login.html', title='Login', form=form)
+    # Jika ada validasi error, kembali ke halaman login
+    for field, errors in form.errors.items():
+        for error in errors:
+            flash(f'{getattr(form, field).label.text}: {error}', 'danger')
+    return redirect(url_for('main.index', view='login'))
 
 @auth_bp.route('/logout')
 def logout():
@@ -36,9 +42,11 @@ def logout():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
-    if current_user.is_authenticated:
-        return redirect(url_for('main.index'))
+    # Redirect ke halaman utama dengan view=register
+    if request.method == 'GET':
+        return redirect(url_for('main.index', view='register'))
     
+    # Handle POST request untuk register
     form = RegistrationForm()
     if form.validate_on_submit():
         user = User(username=form.username.data, email=form.email.data)
@@ -46,16 +54,16 @@ def register():
         db.session.add(user)
         db.session.commit()
         flash('Selamat! Akun Anda berhasil dibuat.', 'success')
-        return redirect(url_for('auth.login'))
+        return redirect(url_for('main.index', view='login'))
     
-    return render_template('auth/register.html', title='Register', form=form)
+    # Jika ada validasi error, kembali ke halaman register
+    for field, errors in form.errors.items():
+        for error in errors:
+            flash(f'{getattr(form, field).label.text}: {error}', 'danger')
+    return redirect(url_for('main.index', view='register'))
 
 @auth_bp.route('/profile')
 @login_required
 def profile():
-    # Ambil analisis terakhir dari user
-    last_analysis = None
-    if current_user.histories.count() > 0:
-        last_analysis = current_user.histories.order_by(AnalysisHistory.created_at.desc()).first()
-    
-    return render_template('auth/profile.html', title='Profil', last_analysis=last_analysis)
+    # Redirect ke halaman utama dengan view=profile
+    return redirect(url_for('main.index', view='profile'))

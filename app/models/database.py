@@ -49,29 +49,56 @@ class AnalysisHistory(db.Model):
     
     @property
     def hashtags_list(self):
-        if self.top_hashtags:
+        if not self.top_hashtags:
+            return []
+            
+        try:
             return json.loads(self.top_hashtags)
-        return []
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"Error parsing hashtags for history {self.id}: {str(e)}")
+            if isinstance(self.top_hashtags, list):
+                return self.top_hashtags
+            return []
     
     @property
     def topics_list(self):
-        if self.top_topics:
+        if not self.top_topics:
+            return []
+            
+        try:
             return json.loads(self.top_topics)
-        return []
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"Error parsing topics for history {self.id}: {str(e)}")
+            if isinstance(self.top_topics, list):
+                return self.top_topics
+            return []
     
     def to_dict(self):
-        return {
-            'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'created_at': self.created_at.strftime('%d-%m-%Y %H:%M'),
-            'total_tweets': self.total_tweets,
-            'positive_count': self.positive_count,
-            'neutral_count': self.neutral_count,
-            'negative_count': self.negative_count,
-            'positive_percent': self.positive_percent,
-            'neutral_percent': self.neutral_percent,
-            'negative_percent': self.negative_percent,
-            'top_hashtags': self.hashtags_list,
-            'top_topics': self.topics_list
-        }
+        """Convert model to dictionary with proper type handling"""
+        try:
+            return {
+                'id': self.id,
+                'title': self.title,
+                'description': self.description or "",
+                'created_at': self.created_at.strftime('%d-%m-%Y %H:%M') if self.created_at else "",
+                'total_tweets': self.total_tweets or 0,
+                'positive_count': self.positive_count or 0,
+                'neutral_count': self.neutral_count or 0,
+                'negative_count': self.negative_count or 0,
+                'positive_percent': float(self.positive_percent or 0),
+                'neutral_percent': float(self.neutral_percent or 0),
+                'negative_percent': float(self.negative_percent or 0),
+                'top_hashtags': self.hashtags_list,
+                'top_topics': self.topics_list,
+                'file_path': self.file_path or "",
+                'result_file_path': self.result_file_path or ""
+            }
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            # Return minimal dictionary in case of error
+            return {
+                'id': self.id,
+                'title': self.title,
+                'error': str(e)
+            }

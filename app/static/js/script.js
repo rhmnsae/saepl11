@@ -1118,205 +1118,235 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Tambahkan fungsi untuk memulihkan analisis dari data yang disimpan di database
     function recoverAnalysisFromHistory(historyId) {
-        showAlert('Mencoba memulihkan data analisis dari riwayat...', 'info');
+        // Tampilkan loading modal
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        loadingModal.show();
         
-        // Kirim permintaan AJAX untuk memuat data dari riwayat
-        fetch(`/history/show/${historyId}`)
-            .then(response => {
-                if (response.redirected) {
-                    window.location.href = response.url;
-                } else {
-                    return response.json();
-                }
-            })
-            .then(data => {
-                if (data && data.success) {
-                    showAlert('Data analisis berhasil dipulihkan!', 'success');
-                    window.location.href = '/index?view=results';
-                } else if (data && data.error) {
+        // Disable button yang diklik
+        const clickedButton = document.querySelector(`.view-history-btn[data-history-id="${historyId}"]`);
+        if (clickedButton) {
+            clickedButton.disabled = true;
+            clickedButton.innerHTML = `
+                <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Memuat...
+            `;
+        }
+        
+        console.log(`Attempting to recover history with ID: ${historyId}`);
+        
+        // Kirim permintaan fetch untuk memuat data riwayat
+        fetch(`/history/show/${historyId}`, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            console.log("Response received:", response);
+            
+            // Cek apakah respons berisi redirect
+            if (response.redirected) {
+                console.log(`Redirecting to ${response.url}`);
+                window.location.href = response.url;
+                return null;
+            }
+            
+            // Jika respons berupa JSON, parse JSON-nya
+            if (response.headers.get('content-type') && 
+                response.headers.get('content-type').includes('application/json')) {
+                return response.json();
+            }
+            
+            // Jika bukan redirect dan bukan JSON, berarti error atau HTML
+            return null;
+        })
+        .then(data => {
+            if (data) {
+                console.log("Data received:", data);
+                
+                if (data.error) {
+                    // Sembunyikan loading modal
+                    loadingModal.hide();
+                    
+                    // Reset button
+                    if (clickedButton) {
+                        clickedButton.disabled = false;
+                        clickedButton.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            Lihat
+                        `;
+                    }
+                    
+                    // Tampilkan error
                     showAlert(`Gagal memulihkan data: ${data.error}`, 'danger');
+                } else if (data.success) {
+                    showAlert('Data analisis berhasil dipulihkan!', 'success');
+                    window.location.href = '/?view=results';
                 }
-            })
-            .catch(error => {
-                showAlert(`Terjadi kesalahan saat memulihkan data: ${error.message}`, 'danger');
-            });
+            }
+            // Jika data null, berarti sudah di-redirect atau error
+        })
+        .catch(error => {
+            console.error("Error recovering history:", error);
+            
+            // Sembunyikan loading modal
+            loadingModal.hide();
+            
+            // Reset button
+            if (clickedButton) {
+                clickedButton.disabled = false;
+                clickedButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    Lihat
+                `;
+            }
+            
+            showAlert(`Terjadi kesalahan saat memulihkan data: ${error.message}`, 'danger');
+        });
     }
 
     // Tambahkan ini pada handler klik tombol "Lihat" di halaman riwayat
     document.addEventListener('DOMContentLoaded', function() {
+        // Cek apakah kita berada di halaman riwayat
         const viewHistoryButtons = document.querySelectorAll('.view-history-btn');
         
-        viewHistoryButtons.forEach(button => {
-            button.addEventListener('click', function(e) {
-                const historyId = this.getAttribute('data-history-id');
-                if (!historyId) return;
-                
-                // Tambahkan loading state
-                this.innerHTML = `
-                    <div class="spinner-border spinner-border-sm" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    Memuat...
-                `;
-                this.disabled = true;
-            });
-        });
-        
-        // Cek data analisis saat halaman muat (hanya untuk halaman hasil)
-        if (window.location.href.includes('view=results')) {
-            setTimeout(() => {
-                checkAnalysisDataLoaded();
-            }, 1000);
-        }
-
-        function loadAnalysisData() {
-            // Tampilkan indikator loading
-            const loadingDiv = document.createElement('div');
-            loadingDiv.id = 'analysis-loading';
-            loadingDiv.className = 'text-center my-4';
-            loadingDiv.innerHTML = `
-                <div class="spinner-border text-dark" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-2">Memuat data analisis...</p>
-            `;
+        if (viewHistoryButtons.length > 0) {
+            console.log('History page loaded - setting up view buttons');
             
-            // Tambahkan ke halaman jika kita berada di tab results
-            const resultsTab = document.getElementById('results');
-            if (resultsTab && resultsTab.classList.contains('active')) {
-                resultsTab.prepend(loadingDiv);
-            }
-            
-            // Kirim permintaan AJAX ke server
-            fetch('/api/get_current_analysis')
-                .then(response => response.json())
-                .then(data => {
-                    // Hapus indikator loading
-                    const loadingElement = document.getElementById('analysis-loading');
-                    if (loadingElement) loadingElement.remove();
+            viewHistoryButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
                     
-                    if (data.error) {
-                        showAlert('Error: ' + data.error, 'danger');
-                        return;
+                    const historyId = this.getAttribute('data-history-id');
+                    if (!historyId) return;
+                    
+                    // Tambahkan loading state
+                    this.innerHTML = `
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        Memuat...
+                    `;
+                    this.disabled = true;
+                    
+                    // Simpan URL original untuk kembali jika ada error
+                    const originalHref = this.getAttribute('href');
+                    
+                    // Tampilkan loading modal
+                    const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+                    loadingModal.show();
+                    
+                    // Kirim request ke server
+                    fetch(originalHref, {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => {
+                        // Jika server mengirim redirect (success case), ikuti redirect
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                            return;
+                        }
+                        
+                        // Jika response tidak berhasil
+                        if (!response.ok) {
+                            throw new Error(`Server responded with status: ${response.status}`);
+                        }
+                        
+                        // Jika response berhasil tapi bukan redirect, mungkin ada error
+                        return response.json();
+                    })
+                    .catch(error => {
+                        console.error("Error loading history:", error);
+                        
+                        // Sembunyikan loading modal
+                        loadingModal.hide();
+                        
+                        // Reset button state
+                        this.disabled = false;
+                        this.innerHTML = `
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            Lihat
+                        `;
+                        
+                        // Tampilkan error modal
+                        const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                        document.getElementById('errorMessage').textContent = 
+                            'Terjadi kesalahan saat memuat data analisis. File mungkin telah dihapus atau rusak.';
+                        
+                        // Tambahkan detail error
+                        const errorDetails = document.getElementById('errorDetails');
+                        errorDetails.classList.remove('d-none');
+                        errorDetails.innerHTML = `<small class="text-muted">Error: ${error.message}</small>`;
+                        
+                        // Setup retry button
+                        const retryButton = document.getElementById('retryButton');
+                        retryButton.onclick = function() {
+                            errorModal.hide();
+                            window.location.href = originalHref;
+                        };
+                        
+                        errorModal.show();
+                    });
+                });
+            });
+        }
+        
+        // Setup delete forms
+        const deleteForms = document.querySelectorAll('.delete-form');
+        if (deleteForms.length > 0) {
+            console.log('Delete forms found:', deleteForms.length);
+            
+            deleteForms.forEach(form => {
+                form.addEventListener('submit', function(e) {
+                    console.log('Delete form submitted');
+                    
+                    // Tambahkan redirect ke view=history pada action
+                    const currentAction = this.getAttribute('action');
+                    if (currentAction && !currentAction.includes('?view=')) {
+                        this.setAttribute('action', `${currentAction}?view=history`);
                     }
                     
-                    // Simpan data ke variabel global
-                    analysisResults = data;
-                    allTweets = data.tweets || [];
+                    // Tampilkan loading state
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    const originalText = submitBtn.innerHTML;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = `
+                        <div class="spinner-border spinner-border-sm me-1" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        Menghapus...
+                    `;
                     
-                    // Update UI
-                    updateAnalysisResults(data);
+                    // Simpan referensi ke form
+                    const formRef = this;
+                    const recordTitle = this.getAttribute('data-title');
                     
-                    // Initialize pagination untuk tweet
-                    initializePagination();
-                    
-                    // Generate topik untuk chatbot
-                    generateTopics(data);
-                    
-                    // Buat word cloud
-                    createImprovedWordCloud(data);
-                    
-                    console.log('Analysis data loaded successfully');
-                })
-                .catch(error => {
-                    // Hapus indikator loading
-                    const loadingElement = document.getElementById('analysis-loading');
-                    if (loadingElement) loadingElement.remove();
-                    
-                    console.error('Error fetching analysis data:', error);
-                    showAlert('Gagal memuat data analisis. Silakan refresh halaman atau lakukan analisis baru.', 'danger');
+                    // Tambahkan listener untuk berhasil/gagalnya penghapusan
+                    setTimeout(() => {
+                        // Jika form masih ada di DOM, artinya penghapusan mungkin gagal
+                        // Kita perlu melakukan pengecekan tambahan
+                        if (document.body.contains(formRef) && submitBtn.disabled) {
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalText;
+                            
+                            // Sembunyikan modal hapus
+                            const deleteModal = bootstrap.Modal.getInstance(formRef.closest('.modal'));
+                            if (deleteModal) {
+                                deleteModal.hide();
+                            }
+                            
+                            // Tampilkan pesan error
+                            showAlert('Terjadi kesalahan saat menghapus data. Coba lagi nanti.', 'danger');
+                        }
+                    }, 10000);
                 });
-        }
-        
-        // Fungsi untuk memeriksa apakah data analisis perlu dimuat
-        function checkAndLoadAnalysisData() {
-            // Cek apakah kita berada di tab hasil atau evaluasi
-            const resultsTab = document.getElementById('results');
-            const evaluationTab = document.getElementById('evaluation');
-            
-            if ((resultsTab && resultsTab.classList.contains('active')) || 
-                (evaluationTab && evaluationTab.classList.contains('active'))) {
-                
-                // Cek apakah data analisis sudah ada
-                if (!analysisResults || !allTweets || allTweets.length === 0) {
-                    loadAnalysisData();
-                }
-            }
-        }
-        
-        // Cek data analisis saat halaman dimuat
-        checkAndLoadAnalysisData();
-        
-        // Tambahkan event listener untuk tab navigation
-        const navLinks = document.querySelectorAll('.main-tab-link');
-        navLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                // Skip jika tab dinonaktifkan
-                if (this.classList.contains('disabled')) {
-                    return;
-                }
-                
-                // Get target tab ID
-                const targetId = this.getAttribute('data-tab');
-                
-                // Jika tab results atau evaluation yang aktif, cek data analisis
-                if (targetId === 'results' || targetId === 'evaluation') {
-                    setTimeout(checkAndLoadAnalysisData, 100);
-                }
             });
-        });
-    
-        // Tambahkan handler untuk hashchange dan popstate events
-        window.addEventListener('hashchange', checkAndLoadAnalysisData);
-        window.addEventListener('popstate', checkAndLoadAnalysisData);
-        
-        // Fungsi untuk memeriksa apakah data analisis valid
-        function checkAnalysisDataLoaded() {
-            // Cek apakah data tweets tersedia
-            if (!allTweets || allTweets.length === 0) {
-                if (document.getElementById('results').classList.contains('active') || 
-                    document.getElementById('evaluation').classList.contains('active')) {
-                    loadAnalysisData();
-                }
-                return false;
-            }
-            
-            // Cek keberadaan elemen-elemen kunci di hasil analisis
-            const titleElement = document.getElementById('title-placeholder');
-            const totalTweetsElement = document.getElementById('total-tweets');
-            
-            if ((!titleElement || !titleElement.textContent) || 
-                (!totalTweetsElement || totalTweetsElement.textContent === '0')) {
-                loadAnalysisData();
-                return false;
-            }
-            
-            return true;
         }
-        
-        // Cek data setelah beberapa detik (untuk memastikan DOM sudah selesai dirender)
-        setTimeout(checkAnalysisDataLoaded, 500);
-        
-        // Simpan referensi ke fungsi asli updateAnalysisResults
-        const originalUpdateAnalysisResults = window.updateAnalysisResults;
-        
-        // Override fungsi updateAnalysisResults untuk mencegah kehilangan data
-        window.updateAnalysisResults = function(data) {
-            // Panggil fungsi asli
-            if (originalUpdateAnalysisResults) {
-                originalUpdateAnalysisResults(data);
-            }
-            
-            // Simpan data ke sessionStorage sebagai backup
-            try {
-                // Simpan hanya data penting tanpa tweets (untuk menghemat ruang)
-                const storageData = {...data};
-                delete storageData.tweets;
-                sessionStorage.setItem('analysisData', JSON.stringify(storageData));
-            } catch (e) {
-                console.warn('Failed to save analysis data to sessionStorage:', e);
-            }
-        };
     });
     
 

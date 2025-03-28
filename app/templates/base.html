@@ -22,19 +22,19 @@
                     <a href="{{ url_for('main.index') }}" class="text-white text-decoration-none">Analisis Sentimen X</a>
                 </div>
                 <nav>
-                    <a href="{{ url_for('main.index') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view', 'input') == 'input' %}active{% endif %}" data-tab="input">
+                    <a href="{{ url_for('main.index', view='input') }}" class="main-tab-link {% if view == 'input' %}active{% endif %}" data-tab="input">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                         Input Data
                     </a>
-                    <a href="{{ url_for('main.index', view='results') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'results' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="results" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
+                    <a href="{{ url_for('main.index', view='results') }}" class="main-tab-link {% if view == 'results' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="results" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                         Hasil Analisis
                     </a>
-                    <a href="{{ url_for('main.index', view='evaluation') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'evaluation' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="evaluation" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
+                    <a href="{{ url_for('main.index', view='evaluation') }}" class="main-tab-link {% if view == 'evaluation' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="evaluation" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                         Evaluasi Kebijakan
                     </a>
-                    <a href="{{ url_for('history.index') }}" class="nav-link {% if request.endpoint == 'history.index' %}active{% endif %}">
+                    <a href="{{ url_for('main.index', view='history') }}" class="nav-link {% if view == 'history' %}active{% endif %}">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         Riwayat
                     </a>
@@ -46,13 +46,13 @@
                                 {{ current_user.username }}
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">Profil</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('main.index', view='profile') }}">Profil</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
                             </ul>
                         </div>
                     {% else %}
-                        <a href="{{ url_for('auth.login') }}" class="nav-link {% if request.endpoint == 'auth.login' %}active{% endif %}">
+                        <a href="{{ url_for('main.index', view='login') }}" class="nav-link {% if view == 'login' %}active{% endif %}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
                             Login
                         </a>
@@ -115,12 +115,12 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Get all tab navigation links
-            const tabLinks = document.querySelectorAll('.main-tab-link');
+            const navLinks = document.querySelectorAll('.main-tab-link, .nav-link');
             
             // Add click event listeners to each tab link
-            tabLinks.forEach(link => {
+            navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
-                    // If link is disabled, show alert and prevent navigation
+                    // Skip disabled links
                     if (this.classList.contains('disabled')) {
                         e.preventDefault();
                         const alertMsg = this.getAttribute('title') || 'Silakan upload dan analisis data terlebih dahulu';
@@ -147,50 +147,81 @@
                         return;
                     }
                     
-                    // Get the tab ID
-                    const tabId = this.getAttribute('data-tab');
-                    if (!tabId) return;
+                    // Skip if it's not a view link (like logout)
+                    if (!this.getAttribute('href').includes('?view=') && 
+                        !this.getAttribute('href').includes('view=')) {
+                        return;
+                    }
                     
-                    // If it's a main tab, handle client-side
+                    // Skip dropdown toggle
+                    if (this.getAttribute('data-bs-toggle') === 'dropdown') {
+                        return;
+                    }
+                    
+                    // Handle client-side navigation
                     e.preventDefault();
                     
-                    // Update URL
-                    const newUrl = new URL(this.href);
-                    history.pushState({tabId: tabId}, '', newUrl);
+                    // Parse the view parameter from the href
+                    const href = this.getAttribute('href');
+                    const url = new URL(href, window.location.origin);
+                    const viewParam = url.searchParams.get('view');
                     
+                    if (!viewParam) return;
+                    
+                    // Update URL with history API
+                    history.pushState({view: viewParam}, '', url);
+                    
+                    // If it's a special view that needs a full page load
+                    if (['history', 'profile', 'login', 'register'].includes(viewParam)) {
+                        // Perform full page load
+                        window.location.href = href;
+                        return;
+                    }
+                    
+                    // For main tabs, handle client-side
                     // Update active state in navigation
-                    tabLinks.forEach(l => l.classList.remove('active'));
+                    navLinks.forEach(l => l.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // Show the corresponding section
-                    const mainTabContent = document.querySelectorAll('.main-tab-content');
-                    mainTabContent.forEach(content => {
-                        content.classList.remove('active');
-                        content.classList.add('d-none');
-                    });
-                    
-                    const targetContent = document.getElementById(tabId);
-                    if (targetContent) {
-                        targetContent.classList.add('active');
-                        targetContent.classList.remove('d-none');
-                        
-                        // Trigger custom event for tab change
-                        const tabChangeEvent = new CustomEvent('tabChanged', {
-                            detail: { tabId: tabId }
+                    // Show the corresponding section for main tabs
+                    if (['input', 'results', 'evaluation'].includes(viewParam)) {
+                        const mainTabContent = document.querySelectorAll('.main-tab-content');
+                        mainTabContent.forEach(content => {
+                            content.classList.remove('active');
+                            content.classList.add('d-none');
                         });
-                        document.dispatchEvent(tabChangeEvent);
+                        
+                        const targetContent = document.getElementById(viewParam);
+                        if (targetContent) {
+                            targetContent.classList.add('active');
+                            targetContent.classList.remove('d-none');
+                            
+                            // Trigger custom event for tab change
+                            const tabChangeEvent = new CustomEvent('tabChanged', {
+                                detail: { tabId: viewParam }
+                            });
+                            document.dispatchEvent(tabChangeEvent);
+                        }
                     }
                 });
             });
             
             // Handle popstate event (browser back/forward)
             window.addEventListener('popstate', function(event) {
-                if (event.state && event.state.tabId) {
-                    const tabId = event.state.tabId;
-                    
+                const urlParams = new URLSearchParams(window.location.search);
+                const viewParam = urlParams.get('view') || 'input';
+                
+                // For special views, perform full page load
+                if (['history', 'profile', 'login', 'register'].includes(viewParam)) {
+                    window.location.reload();
+                    return;
+                }
+                
+                // For main tabs, handle client-side
+                if (['input', 'results', 'evaluation'].includes(viewParam)) {
                     // Update active state in navigation
-                    tabLinks.forEach(l => {
-                        if (l.getAttribute('data-tab') === tabId) {
+                    navLinks.forEach(l => {
+                        if (l.getAttribute('href').includes(`view=${viewParam}`)) {
                             l.classList.add('active');
                         } else {
                             l.classList.remove('active');
@@ -200,7 +231,7 @@
                     // Show the corresponding section
                     const mainTabContent = document.querySelectorAll('.main-tab-content');
                     mainTabContent.forEach(content => {
-                        if (content.id === tabId) {
+                        if (content.id === viewParam) {
                             content.classList.add('active');
                             content.classList.remove('d-none');
                         } else {
@@ -211,38 +242,41 @@
                     
                     // Trigger custom event for tab change
                     const tabChangeEvent = new CustomEvent('tabChanged', {
-                        detail: { tabId: tabId }
+                        detail: { tabId: viewParam }
                     });
                     document.dispatchEvent(tabChangeEvent);
                 }
             });
             
             // Add initial state
-            const view = '{{ request.args.get("view", "input") }}';
-            history.replaceState({tabId: view}, '', window.location.href);
+            const currentView = '{{ view }}' || 'input';
+            history.replaceState({view: currentView}, '', window.location.href);
             
             // Handle the active tab based on the current view
             const mainTabContent = document.querySelectorAll('.main-tab-content');
             
-            // Hide all content first
-            mainTabContent.forEach(c => {
-                if (c) {
-                    c.classList.remove('active');
-                    c.classList.add('d-none');
-                }
-            });
-            
-            // Show the current view content
-            const targetContent = document.getElementById(view);
-            if (targetContent) {
-                targetContent.classList.add('active');
-                targetContent.classList.remove('d-none');
-            } else {
-                // If no specific view or invalid view, show input by default
-                const inputContent = document.getElementById('input');
-                if (inputContent) {
-                    inputContent.classList.add('active');
-                    inputContent.classList.remove('d-none');
+            // For main tab views, ensure correct tab is active
+            if (['input', 'results', 'evaluation'].includes(currentView)) {
+                // Hide all content first
+                mainTabContent.forEach(c => {
+                    if (c) {
+                        c.classList.remove('active');
+                        c.classList.add('d-none');
+                    }
+                });
+                
+                // Show the current view content
+                const targetContent = document.getElementById(currentView);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                    targetContent.classList.remove('d-none');
+                } else {
+                    // If no specific view or invalid view, show input by default
+                    const inputContent = document.getElementById('input');
+                    if (inputContent) {
+                        inputContent.classList.add('active');
+                        inputContent.classList.remove('d-none');
+                    }
                 }
             }
             
@@ -257,7 +291,7 @@
                 }
             });
         });
-        </script>
+    </script>
     
     {% block scripts %}{% endblock %}
 </body>

@@ -196,32 +196,12 @@
     </div>
 </div>
 
-<!-- Modal konfirmasi saat analisis tidak lengkap -->
-<div class="modal fade" id="incompleteDataModal" tabindex="-1" aria-labelledby="incompleteDataModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title" id="incompleteDataModalLabel">Peringatan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex align-items-center mb-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-3 text-warning"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                    <p class="mb-0">Data analisis ini mungkin tidak lengkap. Beberapa informasi mungkin hilang atau tidak valid.</p>
-                </div>
-                <p>Apakah Anda tetap ingin melanjutkan?</p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button type="button" class="btn btn-warning" id="continueButton">Lanjutkan</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- JavaScript untuk halaman riwayat -->
+<!-- JavaScript untuk Debugging -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Debug logging
+    console.log('History page loaded');
+    
     // Inisialisasi tooltips
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
@@ -233,6 +213,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     deleteForms.forEach(form => {
         form.addEventListener('submit', function(e) {
+            console.log('Delete form submitted');
+            
             // Tampilkan loading state
             const submitBtn = this.querySelector('button[type="submit"]');
             const originalText = submitBtn.innerHTML;
@@ -244,15 +226,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 Menghapus...
             `;
             
-            // Simpan referensi ke form
+            // Simpan referensi untuk kasus penghapusan gagal
             const formRef = this;
             const recordTitle = this.getAttribute('data-title');
             
-            // Tambahkan listener untuk berhasil/gagalnya penghapusan
+            // Timeout handler untuk kasus penghapusan gagal
             setTimeout(() => {
-                // Jika form masih ada di DOM, artinya penghapusan mungkin gagal
-                // Kita perlu melakukan pengecekan tambahan
                 if (document.body.contains(formRef) && submitBtn.disabled) {
+                    console.log('Delete timeout - reset button');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalText;
                     
@@ -263,14 +244,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     // Tampilkan pesan error
-                    showStatusAlert('Terjadi kesalahan saat menghapus data. Coba lagi nanti.', 'danger');
+                    showStatusAlert('Terjadi kesalahan saat menghapus data. Mungkin timeout atau server error.', 'danger');
                 }
-            }, 5000);
+            }, 10000); // 10 detik timeout
         });
     });
     
     // Fungsi untuk menampilkan alert status
     function showStatusAlert(message, type = 'info') {
+        console.log('Showing alert:', message, type);
+        
         const alertContainer = document.getElementById('status-alert-container');
         if (alertContainer) {
             const alert = document.createElement('div');
@@ -297,122 +280,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Tambahkan handler untuk tombol Lihat
-    const viewButtons = document.querySelectorAll('.view-history-btn');
-    
-    viewButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-            e.preventDefault(); // Prevent default navigation
-            
-            // Get history ID
-            const historyId = this.getAttribute('data-history-id');
-            if (!historyId) return;
-            
-            // Show loading modal
-            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
-            loadingModal.show();
-            
-            // Tampilkan loading state pada tombol
-            this.innerHTML = `
-                <div class="spinner-border spinner-border-sm me-1" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                Memuat...
-            `;
-            this.disabled = true;
-            
-            // Simpan referensi ke button untuk digunakan nanti
-            const originalButton = this;
-            const originalHref = this.getAttribute('href');
-            
-            // Buat objek untuk menyimpan data
-            let timeoutId = null;
-            
-            // Jadwalkan reset tombol jika halaman tidak berubah dalam 10 detik
-            timeoutId = setTimeout(() => {
-                if (document.body.contains(originalButton) && originalButton.disabled) {
-                    originalButton.disabled = false;
-                    originalButton.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        Lihat
-                    `;
-                    
-                    // Hide loading modal
-                    loadingModal.hide();
-                    
-                    // Show error modal
-                    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-                    document.getElementById('errorMessage').textContent = 
-                        'Terjadi kesalahan saat memuat data analisis. Server tidak merespons dalam waktu yang ditentukan.';
-                    
-                    // Add retry functionality
-                    const retryButton = document.getElementById('retryButton');
-                    retryButton.onclick = function() {
-                        errorModal.hide();
-                        originalButton.click();
-                    };
-                    
-                    errorModal.show();
-                }
-            }, 10000);
-            
-            // Make AJAX request to check if analysis exists
-            fetch(originalHref, {
-                method: 'HEAD',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            }).then(response => {
-                if (response.ok) {
-                    // Analysis exists, redirect to view page
-                    clearTimeout(timeoutId);
-                    window.location.href = originalHref;
-                } else {
-                    throw new Error(`Server responded with status: ${response.status}`);
-                }
-            }).catch(error => {
-                clearTimeout(timeoutId);
-                
-                // Reset button
-                if (document.body.contains(originalButton)) {
-                    originalButton.disabled = false;
-                    originalButton.innerHTML = `
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        Lihat
-                    `;
-                }
-                
-                // Hide loading modal
-                loadingModal.hide();
-                
-                // Show error modal
-                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
-                document.getElementById('errorMessage').textContent = 
-                    'Terjadi kesalahan saat memuat data analisis. File mungkin telah dihapus atau rusak.';
-                
-                // Show technical details
-                const errorDetails = document.getElementById('errorDetails');
-                errorDetails.classList.remove('d-none');
-                errorDetails.innerHTML = `<small class="text-muted">Error: ${error.message}</small>`;
-                
-                // Add retry functionality
-                const retryButton = document.getElementById('retryButton');
-                retryButton.onclick = function() {
-                    errorModal.hide();
-                    originalButton.click();
-                };
-                
-                errorModal.show();
-            });
-        });
-    });
-    
     // Cek status parameter URL
     const urlParams = new URLSearchParams(window.location.search);
     const status = urlParams.get('status');
     const message = urlParams.get('message');
     
     if (status && message) {
+        console.log('URL params found:', status, message);
         showStatusAlert(decodeURIComponent(message), status);
         
         // Bersihkan parameter URL
@@ -421,6 +295,12 @@ document.addEventListener('DOMContentLoaded', function() {
         url.searchParams.delete('message');
         window.history.replaceState({}, '', url);
     }
+    
+    // Log untuk semua error JavaScript
+    window.onerror = function(message, source, lineno, colno, error) {
+        console.error('JS Error:', message, 'at', source, lineno, colno);
+        console.error('Error object:', error);
+    };
 });
 </script>
 {% endblock %}
