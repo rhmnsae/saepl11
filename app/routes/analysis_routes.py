@@ -1,8 +1,11 @@
 import os
 import pandas as pd
+import json
 from flask import Blueprint, current_app, flash, redirect, request, jsonify, send_file, session, url_for
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from app import db
+from app.models.database import AnalysisHistory
 from app.services.sentiment_analysis import predict_sentiments, extract_hashtags, extract_topics
 from app.services.sentiment_analysis import analyze_sentiment_per_hashtag, get_top_users, extract_words_by_sentiment
 from app.services.visualization import create_sentiment_plot, create_improved_word_cloud
@@ -26,6 +29,82 @@ def clean_for_json(value):
     if pd.isna(value) or value is None:
         return ""
     return value
+
+def save_to_database(title, description, file_path, output_file, analysis_data, sentiment_plot=None):
+    """
+    Menyimpan hasil analisis ke database secara otomatis
+    """
+    if not current_user.is_authenticated:
+        return False
+
+    # Extract required data
+    positive_count = analysis_data.get('positive_count', 0)
+    neutral_count = analysis_data.get('neutral_count', 0)
+    negative_count = analysis_data.get('negative_count', 0)
+    total_tweets = analysis_data.get('total_tweets', 0)
+    positive_percent = analysis_data.get('positive_percent', 0)
+    neutral_percent = analysis_data.get('neutral_percent', 0)
+    negative_percent = analysis_data.get('negative_percent', 0)
+    top_hashtags = analysis_data.get('top_hashtags', [])
+    topics = analysis_data.get('topics', [])
+
+    # Convert hashtags to proper format
+    hashtags_json = json.dumps([h.get('tag', h) if isinstance(h, dict) else h for h in top_hashtags[:10]])
+    
+    # Convert topics to proper format
+    topics_json = json.dumps([t.get('topic', t) if isinstance(t, dict) else t for t in topics[:10]])
+
+    # Check if analysis with the same title already exists for this user
+    existing_analysis = AnalysisHistory.query.filter_by(
+        user_id=current_user.id,
+        title=title
+    ).first()
+
+    try:
+        if existing_analysis:
+            # Update existing record
+            existing_analysis.description = description
+            existing_analysis.file_path = file_path
+            existing_analysis.result_file_path = output_file
+            existing_analysis.total_tweets = total_tweets
+            existing_analysis.positive_count = positive_count
+            existing_analysis.neutral_count = neutral_count
+            existing_analysis.negative_count = negative_count
+            existing_analysis.positive_percent = positive_percent
+            existing_analysis.neutral_percent = neutral_percent
+            existing_analysis.negative_percent = negative_percent
+            existing_analysis.top_hashtags = hashtags_json
+            existing_analysis.top_topics = topics_json
+            existing_analysis.sentiment_plot = sentiment_plot
+            existing_analysis.created_at = datetime.utcnow()
+        else:
+            # Create new record
+            new_analysis = AnalysisHistory(
+                title=title,
+                description=description,
+                file_path=file_path,
+                result_file_path=output_file,
+                total_tweets=total_tweets,
+                positive_count=positive_count,
+                neutral_count=neutral_count,
+                negative_count=negative_count,
+                positive_percent=positive_percent,
+                neutral_percent=neutral_percent,
+                negative_percent=negative_percent,
+                top_hashtags=hashtags_json,
+                top_topics=topics_json,
+                sentiment_plot=sentiment_plot,
+                user_id=current_user.id
+            )
+            db.session.add(new_analysis)
+
+        # Commit changes
+        db.session.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving to database: {str(e)}")
+        db.session.rollback()
+        return False
 
 @analysis_bp.route('/upload', methods=['POST'])
 @login_required
@@ -168,6 +247,22 @@ def upload_file():
                 'top_hashtags': [h['tag'] for h in analysis_results['top_hashtags'][:5]],
                 'top_topics': [t['topic'] for t in topics[:5]]
             }
+            
+            # Force the session to be saved
+            session.modified = True
+            
+            # AUTO-SAVE TO DATABASE
+            save_success = save_to_database(
+                title=title,
+                description=description,
+                file_path=file_path,
+                output_file=output_file,
+                analysis_data=analysis_results,
+                sentiment_plot=sentiment_plot
+            )
+            
+            # Add save status to results
+            analysis_results['saved_to_database'] = save_success
             
             return jsonify(analysis_results)
         except Exception as e:

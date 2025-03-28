@@ -22,26 +22,26 @@
                     <a href="{{ url_for('main.index') }}" class="text-white text-decoration-none">Analisis Sentimen X</a>
                 </div>
                 <nav>
-                    <a href="{{ url_for('main.index') }}" class="nav-tabs-link {% if request.endpoint == 'main.index' and request.args.get('view', 'input') == 'input' %}active{% endif %}">
+                    <a href="{{ url_for('main.index') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view', 'input') == 'input' %}active{% endif %}" data-tab="input">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
                         Input Data
                     </a>
-                    <a href="{{ url_for('main.index', view='results') }}" class="nav-tabs-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'results' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
+                    <a href="{{ url_for('main.index', view='results') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'results' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="results" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
                         Hasil Analisis
                     </a>
-                    <a href="{{ url_for('main.index', view='evaluation') }}" class="nav-tabs-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'evaluation' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
+                    <a href="{{ url_for('main.index', view='evaluation') }}" class="main-tab-link {% if request.endpoint == 'main.index' and request.args.get('view') == 'evaluation' %}active{% endif %} {% if 'analysis_file' not in session %}disabled{% endif %}" data-tab="evaluation" {% if 'analysis_file' not in session %}title="Lakukan analisis terlebih dahulu"{% endif %}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                         Evaluasi Kebijakan
                     </a>
-                    <a href="{{ url_for('history.index') }}" class="nav-tabs-link {% if request.endpoint == 'history.index' %}active{% endif %}">
+                    <a href="{{ url_for('history.index') }}" class="nav-link {% if request.endpoint == 'history.index' %}active{% endif %}">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         Riwayat
                     </a>
                     
                     {% if current_user.is_authenticated %}
                         <div class="dropdown">
-                            <a class="nav-tabs-link dropdown-toggle" href="#" role="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                                 {{ current_user.username }}
                             </a>
@@ -52,7 +52,7 @@
                             </ul>
                         </div>
                     {% else %}
-                        <a href="{{ url_for('auth.login') }}" class="nav-tabs-link {% if request.endpoint == 'auth.login' %}active{% endif %}">
+                        <a href="{{ url_for('auth.login') }}" class="nav-link {% if request.endpoint == 'auth.login' %}active{% endif %}">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
                             Login
                         </a>
@@ -111,16 +111,82 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     
-    <!-- Script to handle the active tab based on the current view -->
+    <!-- Script to handle manual navigation -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Get all tab navigation links
+            const tabLinks = document.querySelectorAll('.main-tab-link');
+            
+            // Add click event listeners to each tab link
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // If link is disabled, show alert and prevent navigation
+                    if (this.classList.contains('disabled')) {
+                        e.preventDefault();
+                        const alertMsg = this.getAttribute('title') || 'Silakan upload dan analisis data terlebih dahulu';
+                        
+                        // Create and display alert
+                        const alertContainer = document.getElementById('alert-container');
+                        if (alertContainer) {
+                            const alert = document.createElement('div');
+                            alert.className = 'alert alert-warning alert-dismissible fade show animate-fade-in';
+                            alert.role = 'alert';
+                            alert.innerHTML = `
+                                ${alertMsg}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            `;
+                            
+                            alertContainer.appendChild(alert);
+                            
+                            // Auto remove after 5 seconds
+                            setTimeout(() => {
+                                alert.classList.remove('show');
+                                setTimeout(() => alert.remove(), 300);
+                            }, 5000);
+                        }
+                        return;
+                    }
+                    
+                    // Get the tab ID
+                    const tabId = this.getAttribute('data-tab');
+                    if (!tabId) return;
+                    
+                    // If it's a main tab, handle client-side
+                    e.preventDefault();
+                    
+                    // Update URL
+                    const newUrl = new URL(this.href);
+                    history.pushState({}, '', newUrl);
+                    
+                    // Update active state in navigation
+                    tabLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    // Show the corresponding section
+                    const mainTabContent = document.querySelectorAll('.main-tab-content');
+                    mainTabContent.forEach(content => {
+                        content.classList.remove('active');
+                        content.classList.add('d-none');
+                    });
+                    
+                    const targetContent = document.getElementById(tabId);
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                        targetContent.classList.remove('d-none');
+                    }
+                });
+            });
+            
+            // Handle the active tab based on the current view
             const view = '{{ request.args.get("view", "input") }}';
             const mainTabContent = document.querySelectorAll('.main-tab-content');
             
             // Hide all content first
             mainTabContent.forEach(c => {
-                c.classList.remove('active');
-                c.classList.add('d-none');
+                if (c) {
+                    c.classList.remove('active');
+                    c.classList.add('d-none');
+                }
             });
             
             // Show the current view content
@@ -128,6 +194,13 @@
             if (targetContent) {
                 targetContent.classList.add('active');
                 targetContent.classList.remove('d-none');
+            } else {
+                // If no specific view or invalid view, show input by default
+                const inputContent = document.getElementById('input');
+                if (inputContent) {
+                    inputContent.classList.add('active');
+                    inputContent.classList.remove('d-none');
+                }
             }
             
             // Save analysis button 

@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, current_user, login_required
 from werkzeug.urls import url_parse
 from app import db
-from app.models.database import User
+from app.models.database import User, AnalysisHistory
 from app.forms.auth_forms import LoginForm, RegistrationForm
 
 auth_bp = Blueprint('auth', __name__)
@@ -53,4 +53,9 @@ def register():
 @auth_bp.route('/profile')
 @login_required
 def profile():
-    return render_template('auth/profile.html', title='Profil')
+    # Ambil analisis terakhir dari user
+    last_analysis = None
+    if current_user.histories.count() > 0:
+        last_analysis = current_user.histories.order_by(AnalysisHistory.created_at.desc()).first()
+    
+    return render_template('auth/profile.html', title='Profil', last_analysis=last_analysis)

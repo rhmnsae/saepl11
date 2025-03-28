@@ -7,6 +7,7 @@ from app.models.database import AnalysisHistory
 from app.services.sentiment_analysis import predict_sentiments
 import pandas as pd
 from werkzeug.utils import secure_filename
+from datetime import datetime
 
 history_bp = Blueprint('history', __name__)
 
@@ -30,6 +31,7 @@ def show(id):
         
         # Store result path in session for reuse
         session['analysis_file'] = history.result_file_path
+        session['original_file'] = history.file_path
         
         # Prepare context for chatbot
         session['analysis_context'] = {
@@ -46,7 +48,11 @@ def show(id):
             'top_topics': history.topics_list
         }
         
+        # Forces the session to be saved
+        session.modified = True
+        
         # Return to results page with loaded data
+        flash('Analisis berhasil dimuat dari riwayat', 'success')
         return redirect(url_for('main.index', view='results'))
     else:
         flash('File hasil analisis tidak ditemukan', 'error')
@@ -94,27 +100,58 @@ def save_analysis():
         flash('File hasil analisis tidak ditemukan', 'error')
         return redirect(url_for('main.index'))
     
-    # Create new history record
-    history = AnalysisHistory(
-        title=context['title'],
-        description=context.get('description', ''),
-        file_path=request.form.get('original_file', ''),
-        result_file_path=analysis_file,
-        total_tweets=context['total_tweets'],
-        positive_count=context['positive_count'],
-        neutral_count=context['neutral_count'],
-        negative_count=context['negative_count'],
-        positive_percent=context['positive_percent'],
-        neutral_percent=context['neutral_percent'],
-        negative_percent=context['negative_percent'],
-        top_hashtags=json.dumps(context['top_hashtags']),
-        top_topics=json.dumps(context['top_topics']),
-        sentiment_plot=request.form.get('sentiment_plot', ''),
-        user_id=current_user.id
-    )
+    # Check if analysis with the same title already exists for this user
+    existing_analysis = AnalysisHistory.query.filter_by(
+        user_id=current_user.id, 
+        title=context['title']
+    ).first()
     
-    db.session.add(history)
-    db.session.commit()
+    if existing_analysis:
+        # Update existing record instead of creating a new one
+        existing_analysis.description = context.get('description', '')
+        existing_analysis.file_path = session.get('original_file', '')
+        existing_analysis.result_file_path = analysis_file
+        existing_analysis.total_tweets = context['total_tweets']
+        existing_analysis.positive_count = context['positive_count']
+        existing_analysis.neutral_count = context['neutral_count']
+        existing_analysis.negative_count = context['negative_count']
+        existing_analysis.positive_percent = context['positive_percent']
+        existing_analysis.neutral_percent = context['neutral_percent']
+        existing_analysis.negative_percent = context['negative_percent']
+        existing_analysis.top_hashtags = json.dumps(context['top_hashtags'])
+        existing_analysis.top_topics = json.dumps(context['top_topics'])
+        existing_analysis.sentiment_plot = request.form.get('sentiment_plot', '')
+        existing_analysis.created_at = datetime.utcnow()  # Update the timestamp
+        
+        db.session.commit()
+        flash('Analisis berhasil diperbarui di riwayat', 'success')
+    else:
+        # Create new history record
+        history = AnalysisHistory(
+            title=context['title'],
+            description=context.get('description', ''),
+            file_path=session.get('original_file', ''),
+            result_file_path=analysis_file,
+            total_tweets=context['total_tweets'],
+            positive_count=context['positive_count'],
+            neutral_count=context['neutral_count'],
+            negative_count=context['negative_count'],
+            positive_percent=context['positive_percent'],
+            neutral_percent=context['neutral_percent'],
+            negative_percent=context['negative_percent'],
+            top_hashtags=json.dumps(context['top_hashtags']),
+            top_topics=json.dumps(context['top_topics']),
+            sentiment_plot=request.form.get('sentiment_plot', ''),
+            user_id=current_user.id
+        )
+        
+        db.session.add(history)
+        db.session.commit()
+        flash('Analisis berhasil disimpan ke riwayat', 'success')
     
-    flash('Analisis berhasil disimpan ke riwayat', 'success')
+    # If this was an AJAX request, return a JSON response
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True, 'message': 'Analisis berhasil disimpan ke riwayat'})
+    
+    # Otherwise redirect to history page
     return redirect(url_for('history.index'))

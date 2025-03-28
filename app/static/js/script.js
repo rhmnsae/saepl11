@@ -69,14 +69,16 @@ document.addEventListener('DOMContentLoaded', function() {
     let negativeWordsChart = null;
     
     // Initialize Charts.js with global defaults
-    Chart.defaults.font.family = "'Inter', sans-serif";
-    Chart.defaults.color = '#333333';
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.tooltip.padding = 10;
-    Chart.defaults.plugins.tooltip.cornerRadius = 6;
-    Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-    Chart.defaults.animation.duration = 1000;
-    Chart.defaults.animation.easing = 'easeOutQuart';
+    if (typeof Chart !== 'undefined') {
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#333333';
+        Chart.defaults.plugins.legend.labels.usePointStyle = true;
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.cornerRadius = 6;
+        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+        Chart.defaults.animation.duration = 1000;
+        Chart.defaults.animation.easing = 'easeOutQuart';
+    }
     
     // Main tab navigation handling
     navLinks.forEach(link => {
@@ -93,14 +95,20 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Remove active class from all links and content
             navLinks.forEach(l => l.classList.remove('active'));
-            mainTabContent.forEach(c => c.classList.remove('active'));
-            mainTabContent.forEach(c => c.classList.add('d-none'));
+            mainTabContent.forEach(c => {
+                if (c) {
+                    c.classList.remove('active');
+                    c.classList.add('d-none');
+                }
+            });
             
             // Add active class to clicked link and show corresponding content
             this.classList.add('active');
             const targetContent = document.getElementById(targetId);
-            targetContent.classList.add('active');
-            targetContent.classList.remove('d-none');
+            if (targetContent) {
+                targetContent.classList.add('active');
+                targetContent.classList.remove('d-none');
+            }
         });
     });
     
@@ -110,14 +118,17 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             
             // Show loading indicator and disable submit button
-            loadingIndicator.classList.remove('d-none');
-            submitBtn.disabled = true;
+            if (loadingIndicator) loadingIndicator.classList.remove('d-none');
+            if (submitBtn) submitBtn.disabled = true;
             
             // Get form data
             const formData = new FormData();
-            formData.append('title', document.getElementById('title').value);
+            const titleInput = document.getElementById('title');
+            const csvFileInput = document.getElementById('csv-file');
+            
+            if (titleInput) formData.append('title', titleInput.value);
             formData.append('description', ''); // Removed description field
-            formData.append('csv-file', document.getElementById('csv-file').files[0]);
+            if (csvFileInput && csvFileInput.files[0]) formData.append('csv-file', csvFileInput.files[0]);
             
             // Send to server
             fetch('/upload', {
@@ -127,8 +138,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(response => response.json())
             .then(data => {
                 // Hide loading indicator and enable submit button
-                loadingIndicator.classList.add('d-none');
-                submitBtn.disabled = false;
+                if (loadingIndicator) loadingIndicator.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = false;
                 
                 if (data.error) {
                     showAlert('Error: ' + data.error, 'danger');
@@ -140,18 +151,33 @@ document.addEventListener('DOMContentLoaded', function() {
                 allTweets = data.tweets;
                 
                 // Show results and evaluation sections
-                document.getElementById('results').classList.remove('d-none');
-                document.getElementById('results').classList.add('active');
-                document.getElementById('evaluation').classList.remove('d-none');
+                const resultsElement = document.getElementById('results');
+                const evaluationElement = document.getElementById('evaluation');
+                
+                if (resultsElement) {
+                    resultsElement.classList.remove('d-none');
+                    resultsElement.classList.add('active');
+                }
+                
+                if (evaluationElement) {
+                    evaluationElement.classList.remove('d-none');
+                }
                 
                 // Enable previously disabled tabs
-                document.querySelector('[data-tab="results"]').classList.remove('disabled');
-                document.querySelector('[data-tab="evaluation"]').classList.remove('disabled');
-                document.getElementById('download-report-btn').classList.remove('disabled');
+                const resultsTab = document.querySelector('[data-tab="results"]');
+                const evaluationTab = document.querySelector('[data-tab="evaluation"]');
+                const downloadReportBtn = document.getElementById('download-report-btn');
+                
+                if (resultsTab) resultsTab.classList.remove('disabled');
+                if (evaluationTab) evaluationTab.classList.remove('disabled');
+                if (downloadReportBtn) downloadReportBtn.classList.remove('disabled');
                 
                 // Update navigation
-                navLinks.forEach(l => l.classList.remove('active'));
-                document.querySelector('[data-tab="results"]').classList.add('active');
+                navLinks.forEach(l => {
+                    if (l) l.classList.remove('active');
+                });
+                
+                if (resultsTab) resultsTab.classList.add('active');
                 
                 // Update UI with analysis results
                 updateAnalysisResults(data);
@@ -166,8 +192,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 createImprovedWordCloud(data);
             })
             .catch(error => {
-                loadingIndicator.classList.add('d-none');
-                submitBtn.disabled = false;
+                if (loadingIndicator) loadingIndicator.classList.add('d-none');
+                if (submitBtn) submitBtn.disabled = false;
                 showAlert('Error: ' + error.message, 'danger');
             });
         });
@@ -189,8 +215,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target.classList.contains('topic-button') || e.target.closest('.topic-button')) {
                 const topicButton = e.target.classList.contains('topic-button') ? e.target : e.target.closest('.topic-button');
                 const topic = topicButton.getAttribute('data-topic') || topicButton.textContent.trim();
-                chatbotInput.value = `Berikan evaluasi kebijakan terkait ${topic}`;
-                sendChatbotMessage();
+                if (chatbotInput) {
+                    chatbotInput.value = `Berikan evaluasi kebijakan terkait ${topic}`;
+                    sendChatbotMessage();
+                }
             }
         });
     }
@@ -229,6 +257,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Filter tweets and update display
     function filterAndDisplayTweets() {
+        if (!sentimentFilter || !allTweets || allTweets.length === 0) return;
+        
         const selectedSentiment = sentimentFilter.value;
         
         // First filter by sentiment
@@ -243,8 +273,8 @@ document.addEventListener('DOMContentLoaded', function() {
             tempFilteredTweets = tempFilteredTweets.filter(tweet => {
                 // Search in content, username or hashtags
                 return (
-                    tweet.content?.toLowerCase().includes(searchQuery) || 
-                    tweet.username?.toLowerCase().includes(searchQuery)
+                    (tweet.content?.toLowerCase().includes(searchQuery) || false) || 
+                    (tweet.username?.toLowerCase().includes(searchQuery) || false)
                 );
             });
         }
@@ -260,6 +290,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Update pagination controls
     function updatePagination() {
+        if (!paginationContainer || !filteredTweets) return;
+        
         const totalPages = Math.ceil(filteredTweets.length / tweetsPerPage);
         
         // Adjust current page if needed
@@ -358,6 +390,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Display tweets for current page
     function displayTweets() {
         const tweetContainer = document.getElementById('tweet-container');
+        if (!tweetContainer || !filteredTweets) return;
+        
         tweetContainer.innerHTML = '';
         
         if (!filteredTweets || filteredTweets.length === 0) {
@@ -384,15 +418,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                   tweet.predicted_sentiment === 'Netral' ? 'badge-neutral' : 'badge-negative';
             
             // Process tweet content to make links clickable
-            const linkifiedContent = linkifyText(tweet.content);
+            const linkifiedContent = linkifyText(tweet.content || '');
             
             // Format date to be more readable
-            const formattedDate = formatDate(tweet.date);
+            const formattedDate = formatDate(tweet.date || '');
             
             tweetCard.innerHTML = `
                 <div class="tweet-header">
                     <span class="tweet-username">
-                        <a href="https://twitter.com/${tweet.username}" target="_blank">@${tweet.username}</a>
+                        <a href="https://twitter.com/${tweet.username || ''}" target="_blank">@${tweet.username || ''}</a>
                     </span>
                     <span class="tweet-date">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
@@ -414,8 +448,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="d-flex justify-content-between align-items-center mt-2">
                     <div>
-                        <span class="tweet-badge ${sentimentClass}">${tweet.predicted_sentiment}</span>
-                        <span class="confidence-badge">${tweet.confidence.toFixed(1)}%</span>
+                        <span class="tweet-badge ${sentimentClass}">${tweet.predicted_sentiment || ''}</span>
+                        <span class="confidence-badge">${typeof tweet.confidence === 'number' ? tweet.confidence.toFixed(1) : '0'}%</span>
                     </div>
                     ${tweet.tweet_url ? `
                         <a href="${tweet.tweet_url}" class="btn btn-sm btn-outline-dark" target="_blank">
@@ -502,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Generate topics automatically based on analysis results
     function generateTopics(data) {
-        if (!chatbotTopicButtons) return;
+        if (!chatbotTopicButtons || !data) return;
         
         chatbotTopicButtons.innerHTML = '';
         
@@ -512,15 +546,20 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add from hashtags
         if (data.top_hashtags && data.top_hashtags.length > 0) {
             data.top_hashtags.slice(0, 7).forEach(hashtag => {
-                const topic = hashtag.tag.replace('#', '');
-                topics.add(topic);
+                const tag = hashtag.tag || hashtag;
+                if (typeof tag === 'string') {
+                    const topic = tag.replace('#', '');
+                    topics.add(topic);
+                }
             });
         }
         
         // Add from topics
         if (data.topics && data.topics.length > 0) {
             data.topics.slice(0, 7).forEach(topic => {
-                topics.add(topic.topic);
+                if (topic && topic.topic) {
+                    topics.add(topic.topic);
+                }
             });
         }
         
@@ -557,6 +596,8 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         
         Array.from(topics).forEach(topic => {
+            if (!topic) return;
+            
             const button = document.createElement('button');
             button.className = 'topic-button animate-fade-in';
             button.setAttribute('data-topic', topic);
@@ -575,280 +616,186 @@ document.addEventListener('DOMContentLoaded', function() {
         chatbotTopicButtons.appendChild(messageDiv);
     }
     
-    // Create improved word cloud
-    function createImprovedWordCloud(data) {
-        const wordCloudContainer = document.getElementById('word-cloud-container');
-        if (!wordCloudContainer || !data || !data.tweets || data.tweets.length === 0) return;
+    // Function to update analysis results in UI
+    function updateAnalysisResults(data) {
+        if (!data) return;
         
-        // Add loading indicator
-        wordCloudContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+        // Update title and description
+        const titlePlaceholder = document.getElementById('title-placeholder');
+        if (titlePlaceholder) titlePlaceholder.textContent = data.title || '';
         
-        // Create word frequency counts
-        const wordFrequencies = {};
+        // Update counts and percentages
+        updateElementText('total-tweets', data.total_tweets);
+        updateElementText('positive-count', data.positive_count);
+        updateElementText('neutral-count', data.neutral_count);
+        updateElementText('negative-count', data.negative_count);
         
-        // Stopwords to filter out (expanded list)
-        const stopwords = [
-            'yang', 'dan', 'di', 'dengan', 'untuk', 'pada', 'adalah', 'ini', 'itu', 'atau', 'juga',
-            'dari', 'akan', 'ke', 'karena', 'oleh', 'saat', 'dalam', 'secara', 'telah', 'sebagai',
-            'bahwa', 'dapat', 'para', 'harus', 'namun', 'seperti', 'hingga', 'tak', 'tidak', 'tapi',
-            'kita', 'kami', 'saya', 'mereka', 'dia', 'http', 'https', 'co', 't', 'a', 'amp', 'rt',
-            'nya', 'yg', 'dgn', 'utk', 'dr', 'pd', 'jd', 'sdh', 'tdk', 'bisa', 'ada', 'kalo', 'bgt',
-            'aja', 'gitu', 'gak', 'mau', 'biar', 'kan', 'klo', 'deh', 'sih', 'nya', 'nih', 'loh'
-        ];
+        updateElementText('positive-percent', (data.positive_percent || 0) + '%');
+        updateElementText('neutral-percent', (data.neutral_percent || 0) + '%');
+        updateElementText('negative-percent', (data.negative_percent || 0) + '%');
         
-        // Process each tweet to extract words
-        data.tweets.forEach(tweet => {
-            if (!tweet.content) return;
-            
-            // Extract words from content
-            let content = tweet.content.toLowerCase();
-            
-            // Remove URLs
-            content = content.replace(/https?:\/\/[^\s]+/g, '');
-            
-            // Remove special characters and emoji
-            content = content.replace(/[^\w\s]/g, ' ');
-            
-            // Split into words
-            const words = content.split(/\s+/);
-            
-            // Filter words
-            const filteredWords = words.filter(word => 
-                word.length > 3 &&  // Filter words with length > 3
-                !stopwords.includes(word) &&  // Filter out stopwords
-                !/^\d+$/.test(word)  // Filter out numbers
-            );
-            
-            // Count word frequencies
-            filteredWords.forEach(word => {
-                wordFrequencies[word] = (wordFrequencies[word] || 0) + 1;
-            });
-        });
+        // Update sentiment distribution with animation
+        updateProgressBar('positive-segment', data.positive_percent);
+        updateProgressBar('neutral-segment', data.neutral_percent);
+        updateProgressBar('negative-segment', data.negative_percent);
         
-        // Convert to array for word cloud
-        const wordsArray = Object.entries(wordFrequencies)
-            .map(([text, value]) => ({ text, value }))
-            .filter(item => item.value > 1)  // Filter words that appear more than once
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 100);  // Limit to top 100 words
+        // Update stats cards
+        updateStatsCard('positive-stats', 'positive', '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>');
+        updateStatsCard('neutral-stats', 'neutral', '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>');
+        updateStatsCard('negative-stats', 'negative', '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>');
         
-        if (wordsArray.length === 0) {
-            wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan word cloud.</p>';
-            return;
+        // Update other UI elements
+        updateHashtags('top-hashtags', data.top_hashtags);
+        updateHashtags('all-hashtags', data.top_hashtags);
+        updateTopUsers('top-users', data.top_users);
+        updateTopics('main-topics', data.topics);
+        updateTopics('topik-utama', data.topics);
+        updateHashtagSentiment('hashtag-sentiment', data.hashtag_sentiment);
+        
+        // Update charts
+        if (data.hashtag_sentiment) createSentimentByHashtagChart(data.hashtag_sentiment);
+        if (data.tweets) {
+            createSentimentByLocationChart(data.tweets);
+            createSentimentByLanguageChart(data.tweets);
         }
+        if (data.sentiment_words) createTopWordsCharts(data.sentiment_words);
         
-        // Normalize word sizes between minSize and maxSize
-        const minCount = Math.min(...wordsArray.map(w => w.value));
-        const maxCount = Math.max(...wordsArray.map(w => w.value));
-        const minSize = 12;
-        const maxSize = 60;
+        // Update sentiment plot
+        updateSentimentPlot('sentiment-plot', data.sentiment_plot);
         
-        // Adjust word sizes
-        wordsArray.forEach(word => {
-            // Normalize size
-            const size = minSize + ((word.value - minCount) / (maxCount - minCount)) * (maxSize - minSize);
-            word.size = size;
-            
-            // Assign a color based on sentiment association
-            // Use a black/gray scale for the monochrome theme
-            const intensity = Math.round((word.value - minCount) / (maxCount - minCount) * 200);
-            word.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
-        });
-        
-        // Create SVG element
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', '100%');
-        svg.style.opacity = 0;
-        wordCloudContainer.appendChild(svg);
-        
-        // Set up word cloud layout
-        const width = wordCloudContainer.clientWidth || 500;
-        const height = wordCloudContainer.clientHeight || 400;
-        
-        try {
-            // Use d3.layout.cloud for the word cloud
-            const layout = d3.layout.cloud()
-                .size([width, height])
-                .words(wordsArray)
-                .padding(5)
-                .rotate(() => Math.random() < 0.5 ? 0 : 90)
-                .font('Inter')
-                .fontSize(d => d.size)
-                .on('end', draw);
-            
-            layout.start();
-            
-            function draw(words) {
-                // Remove loading spinner
-                const loadingIndicator = wordCloudContainer.querySelector('.chart-loader');
-                if (loadingIndicator) {
-                    wordCloudContainer.removeChild(loadingIndicator);
-                }
-                
-                d3.select(svg)
-                    .attr('width', layout.size()[0])
-                    .attr('height', layout.size()[1])
-                    .append('g')
-                    .attr('transform', `translate(${layout.size()[0] / 2},${layout.size()[1] / 2})`)
-                    .selectAll('text')
-                    .data(words)
-                    .enter()
-                    .append('text')
-                    .style('font-size', d => `${d.size}px`)
-                    .style('font-family', 'Inter, sans-serif')
-                    .style('font-weight', d => Math.min(900, 300 + Math.floor(d.size * 10)))
-                    .style('fill', d => d.color)
-                    .attr('text-anchor', 'middle')
-                    .attr('transform', d => `translate(${d.x},${d.y}) rotate(${d.rotate})`)
-                    .text(d => d.text)
-                    .style('opacity', 0)
-                    .transition()
-                    .duration(1000)
-                    .style('opacity', 1)
-                    .on('end', function() {
-                        d3.select(this)
-                            .on('mouseover', function(d) {
-                                d3.select(this)
-                                    .transition()
-                                    .duration(200)
-                                    .style('font-size', `${d.size * 1.2}px`)
-                                    .style('fill', '#000');
-                            })
-                            .on('mouseout', function(d) {
-                                d3.select(this)
-                                    .transition()
-                                    .duration(200)
-                                    .style('font-size', `${d.size}px`)
-                                    .style('fill', d.color);
+        // Initialize chatbot
+        initializeChatbot(data);
+
+        if (data.hasOwnProperty('saved_to_database')) {
+            const saveIndicator = document.getElementById('autosave-indicator');
+            if (saveIndicator) {
+                if (data.saved_to_database) {
+                    saveIndicator.classList.remove('d-none');
+                    saveIndicator.classList.add('alert-success');
+                } else {
+                    saveIndicator.classList.add('d-none');
+                    
+                    // Show manual save button if auto-save failed
+                    const saveButtonContainer = document.createElement('div');
+                    saveButtonContainer.className = 'alert alert-warning mb-3';
+                    saveButtonContainer.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-info-circle me-2"></i> 
+                                <strong>Penting:</strong> Penyimpanan otomatis gagal. Silakan simpan hasil analisis secara manual.
+                            </div>
+                            <button id="manual-save-btn" class="btn btn-dark">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Simpan ke Riwayat
+                            </button>
+                        </div>
+                    `;
+                    
+                    // Insert before results
+                    const resultsContainer = document.querySelector('#results > .card');
+                    if (resultsContainer) {
+                        resultsContainer.prepend(saveButtonContainer);
+                        
+                        // Add event listener for manual save
+                        const manualSaveBtn = document.getElementById('manual-save-btn');
+                        if (manualSaveBtn) {
+                            manualSaveBtn.addEventListener('click', function() {
+                                // Create form for manual save
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = '/history/save';
+                                
+                                // Add original file path
+                                const originalFileInput = document.createElement('input');
+                                originalFileInput.type = 'hidden';
+                                originalFileInput.name = 'original_file';
+                                originalFileInput.value = data.original_file || '';
+                                form.appendChild(originalFileInput);
+                                
+                                // Add sentiment plot
+                                const sentimentPlotInput = document.createElement('input');
+                                sentimentPlotInput.type = 'hidden';
+                                sentimentPlotInput.name = 'sentiment_plot';
+                                const sentimentPlot = document.getElementById('sentiment-plot');
+                                if (sentimentPlot && sentimentPlot.src) {
+                                    sentimentPlotInput.value = sentimentPlot.src;
+                                }
+                                form.appendChild(sentimentPlotInput);
+                                
+                                // Submit form
+                                document.body.appendChild(form);
+                                form.submit();
                             });
-                    });
-                
-                // Fade in the SVG
-                svg.style.transition = 'opacity 1s ease';
-                svg.style.opacity = 1;
+                        }
+                    }
+                }
             }
-        } catch (error) {
-            console.error("Error creating word cloud:", error);
-            // Fallback to simple word display
-            wordCloudContainer.innerHTML = '';
-            
-            const wordCloudFallback = document.createElement('div');
-            wordCloudFallback.className = 'd-flex flex-wrap justify-content-center align-items-center h-100';
-            
-            wordsArray.slice(0, 50).forEach((word, index) => {
-                const wordSpan = document.createElement('span');
-                wordSpan.textContent = word.text;
-                wordSpan.style.fontSize = `${word.size / 10}rem`;
-                wordSpan.style.fontWeight = Math.min(900, 300 + Math.floor(word.size * 10));
-                wordSpan.style.color = word.color;
-                wordSpan.style.padding = '5px';
-                wordSpan.style.display = 'inline-block';
-                wordSpan.style.transition = 'all 0.3s ease';
-                wordSpan.style.opacity = 0;
-                wordSpan.style.transform = 'translateY(20px)';
-                
-                wordSpan.addEventListener('mouseover', function() {
-                    this.style.transform = 'scale(1.2)';
-                    this.style.color = '#000000';
-                });
-                
-                wordSpan.addEventListener('mouseout', function() {
-                    this.style.transform = 'scale(1)';
-                    this.style.color = word.color;
-                });
-                
-                wordCloudFallback.appendChild(wordSpan);
-                
-                // Animate entrance with delay based on index
-                setTimeout(() => {
-                    wordSpan.style.opacity = 1;
-                    wordSpan.style.transform = 'translateY(0)';
-                }, 50 * index);
-            });
-            
-            wordCloudContainer.appendChild(wordCloudFallback);
         }
     }
     
-    // Function to update analysis results in UI
-    function updateAnalysisResults(data) {
-        // Update title and description
-        document.getElementById('title-placeholder').textContent = data.title;
+    // Helper function to update element text
+    function updateElementText(id, text) {
+        const element = document.getElementById(id);
+        if (element) element.textContent = text || '';
+    }
+    
+    // Helper function to update progress bar
+    function updateProgressBar(id, percentage) {
+        const element = document.getElementById(id);
+        if (!element) return;
         
-        // Update counts and percentages
-        document.getElementById('total-tweets').textContent = data.total_tweets;
-        document.getElementById('positive-count').textContent = data.positive_count;
-        document.getElementById('neutral-count').textContent = data.neutral_count;
-        document.getElementById('negative-count').textContent = data.negative_count;
+        // Reset width first
+        element.style.width = '0%';
         
-        document.getElementById('positive-percent').textContent = data.positive_percent + '%';
-        document.getElementById('neutral-percent').textContent = data.neutral_percent + '%';
-        document.getElementById('negative-percent').textContent = data.negative_percent + '%';
-        
-        // Update sentiment distribution with animation
-        const positiveSegment = document.getElementById('positive-segment');
-        const neutralSegment = document.getElementById('neutral-segment');
-        const negativeSegment = document.getElementById('negative-segment');
-        
-        // Reset widths first
-        positiveSegment.style.width = '0%';
-        neutralSegment.style.width = '0%';
-        negativeSegment.style.width = '0%';
-        
-        // Then animate to new values
+        // Then animate to new value
         setTimeout(() => {
-            positiveSegment.style.width = data.positive_percent + '%';
-            positiveSegment.textContent = data.positive_percent + '%';
-            neutralSegment.style.width = data.neutral_percent + '%';
-            neutralSegment.textContent = data.neutral_percent + '%';
-            negativeSegment.style.width = data.negative_percent + '%';
-            negativeSegment.textContent = data.negative_percent + '%';
+            element.style.width = (percentage || 0) + '%';
+            element.textContent = (percentage || 0) + '%';
         }, 100);
+    }
+    
+    // Helper function to update stats card
+    function updateStatsCard(id, className, iconHtml) {
+        const element = document.getElementById(id);
+        if (!element) return;
         
-        // Make sure the stats cards have appropriate classes and icons
-        const positiveStats = document.getElementById('positive-stats');
-        const neutralStats = document.getElementById('neutral-stats');
-        const negativeStats = document.getElementById('negative-stats');
+        element.className = `stats-card ${className || ''} animate-fade-in`;
+        const iconElement = element.querySelector('.icon');
+        if (iconElement) iconElement.innerHTML = iconHtml || '';
+    }
+    
+    // Helper function to update hashtags
+    function updateHashtags(containerId, hashtags) {
+        const container = document.getElementById(containerId);
+        if (!container || !hashtags || !Array.isArray(hashtags)) return;
         
-        positiveStats.className = 'stats-card positive animate-fade-in';
-        positiveStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>';
+        container.innerHTML = '';
         
-        neutralStats.className = 'stats-card neutral animate-fade-in';
-        neutralStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
-        
-        negativeStats.className = 'stats-card negative animate-fade-in';
-        negativeStats.querySelector('.icon').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"></path></svg>';
-        
-        // Update top hashtags with animation
-        const topHashtags = document.getElementById('top-hashtags');
-        topHashtags.innerHTML = '';
-        
-        data.top_hashtags.forEach((hashtag, index) => {
+        hashtags.forEach((hashtag, index) => {
             const tag = document.createElement('div');
             tag.className = 'tag animate-fade-in';
             tag.style.animationDelay = `${index * 0.1}s`;
-            tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
-            topHashtags.appendChild(tag);
+            
+            const hashtagText = hashtag.tag || hashtag;
+            const hashtagCount = hashtag.count !== undefined ? ` (${hashtag.count})` : '';
+            
+            tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtagText}${hashtagCount}`;
+            container.appendChild(tag);
         });
+    }
+    
+    // Helper function to update top users
+    function updateTopUsers(containerId, users) {
+        const container = document.getElementById(containerId);
+        if (!container || !users || !Array.isArray(users)) return;
         
-        // Update all hashtags
-        const allHashtags = document.getElementById('all-hashtags');
-        allHashtags.innerHTML = '';
+        container.innerHTML = '';
         
-        data.top_hashtags.forEach((hashtag, index) => {
-            const tag = document.createElement('div');
-            tag.className = 'tag animate-fade-in';
-            tag.style.animationDelay = `${index * 0.05}s`;
-            tag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16"></path><path d="M4 15h16"></path><path d="M10 3L8 21"></path><path d="M16 3l-2 18"></path></svg> ${hashtag.tag} (${hashtag.count})`;
-            allHashtags.appendChild(tag);
-        });
-        
-        // Update top users
-        const topUsers = document.getElementById('top-users');
-        topUsers.innerHTML = '';
-        
-        data.top_users.forEach(user => {
+        users.forEach(user => {
             const row = document.createElement('tr');
             row.className = 'animate-fade-in';
             
@@ -856,94 +803,74 @@ document.addEventListener('DOMContentLoaded', function() {
                                   user.dominant_sentiment === 'Netral' ? 'sentiment-neutral' : 'sentiment-negative';
             
             row.innerHTML = `
-                <td><a href="https://twitter.com/${user.username}" target="_blank">@${user.username}</a></td>
-                <td>${user.count}</td>
-                <td>${Math.round(user.avg_engagement)}</td>
-                <td><span class="${sentimentClass}">${user.dominant_sentiment}</span></td>
+                <td><a href="https://twitter.com/${user.username || ''}" target="_blank">@${user.username || ''}</a></td>
+                <td>${user.count || 0}</td>
+                <td>${Math.round(user.avg_engagement || 0)}</td>
+                <td><span class="${sentimentClass}">${user.dominant_sentiment || ''}</span></td>
             `;
             
-            topUsers.appendChild(row);
+            container.appendChild(row);
         });
+    }
+    
+    // Helper function to update topics
+    function updateTopics(containerId, topics) {
+        const container = document.getElementById(containerId);
+        if (!container || !topics || !Array.isArray(topics)) return;
         
-        // Update main topics
-        const mainTopics = document.getElementById('main-topics');
-        mainTopics.innerHTML = '';
+        container.innerHTML = '';
         
-        data.topics.forEach((topic, index) => {
+        topics.forEach((topic, index) => {
             const row = document.createElement('tr');
             row.className = 'animate-fade-in';
             row.style.animationDelay = `${index * 0.1}s`;
             
             row.innerHTML = `
-                <td>${topic.topic}</td>
-                <td>${topic.frequency}</td>
+                <td>${topic.topic || ''}</td>
+                <td>${topic.frequency || 0}</td>
             `;
             
-            mainTopics.appendChild(row);
+            container.appendChild(row);
         });
-
-
-        // Update main topics
-        const topikUtama = document.getElementById('topik-utama');
-        topikUtama.innerHTML = '';
+    }
+    
+    // Helper function to update hashtag sentiment
+    function updateHashtagSentiment(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container || !data || !Array.isArray(data)) return;
         
-        data.topics.forEach((topic, index) => {
+        container.innerHTML = '';
+        
+        data.forEach((stat, index) => {
             const row = document.createElement('tr');
             row.className = 'animate-fade-in';
             row.style.animationDelay = `${index * 0.1}s`;
             
             row.innerHTML = `
-                <td>${topic.topic}</td>
-                <td>${topic.frequency}</td>
+                <td>${stat.tag || ''}</td>
+                <td>${stat.positive || 0}%</td>
+                <td>${stat.neutral || 0}%</td>
+                <td>${stat.negative || 0}%</td>
+                <td>${stat.total || 0}</td>
             `;
             
-            topikUtama.appendChild(row);
+            container.appendChild(row);
         });
+    }
+    
+    // Helper function to update sentiment plot
+    function updateSentimentPlot(id, plotData) {
+        const element = document.getElementById(id);
+        if (!element || !plotData) return;
         
-        // Update hashtag sentiment
-        const hashtagSentiment = document.getElementById('hashtag-sentiment');
-        hashtagSentiment.innerHTML = '';
-        
-        data.hashtag_sentiment.forEach((stat, index) => {
-            const row = document.createElement('tr');
-            row.className = 'animate-fade-in';
-            row.style.animationDelay = `${index * 0.1}s`;
-            
-            row.innerHTML = `
-                <td>${stat.tag}</td>
-                <td>${stat.positive}%</td>
-                <td>${stat.neutral}%</td>
-                <td>${stat.negative}%</td>
-                <td>${stat.total}</td>
-            `;
-            
-            hashtagSentiment.appendChild(row);
-        });
-        
-        // Initialize data for charts
-        createSentimentByHashtagChart(data.hashtag_sentiment);
-        createSentimentByLocationChart(data.tweets);
-        createSentimentByLanguageChart(data.tweets);
-        createTopWordsCharts(data.sentiment_words);
-        
-        // Update sentiment plot
-        if (data.sentiment_plot) {
-            const sentimentPlot = document.getElementById('sentiment-plot');
-            sentimentPlot.src = 'data:image/png;base64,' + data.sentiment_plot;
-            sentimentPlot.classList.remove('d-none');
-            sentimentPlot.classList.add('animate-fade-in');
-        } else {
-            document.getElementById('sentiment-plot').classList.add('d-none');
-        }
-
-        // Initialize the welcome message in chatbot
-        initializeChatbot(data);
+        element.src = 'data:image/png;base64,' + plotData;
+        element.classList.remove('d-none');
+        element.classList.add('animate-fade-in');
     }
     
     // Initialize chatbot with welcome message
     function initializeChatbot(data) {
-        const chatbotMessages = document.getElementById('chatbot-messages');
-        if (!chatbotMessages) return;
+        if (!chatbotMessages || !data) return;
         
         // Clear any existing messages
         chatbotMessages.innerHTML = '';
@@ -955,13 +882,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // Build the welcome message with data from analysis
         let messageContent = `
             <div class="mb-2"><strong>Selamat datang di Chatbot Evaluasi Kebijakan!</strong></div>
-            <p>Saya akan membantu Anda menganalisis data sentimen X tentang ${data.title}.</p>
+            <p>Saya akan membantu Anda menganalisis data sentimen X tentang ${data.title || 'topik ini'}.</p>
             <div class="mb-2"><strong>Ringkasan Analisis:</strong></div>
             <ul>
-                <li>Total tweets: ${data.total_tweets}</li>
-                <li>Sentimen Positif: ${data.positive_count} tweets (${data.positive_percent}%)</li>
-                <li>Sentimen Netral: ${data.neutral_count} tweets (${data.neutral_percent}%)</li>
-                <li>Sentimen Negatif: ${data.negative_count} tweets (${data.negative_percent}%)</li>
+                <li>Total tweets: ${data.total_tweets || 0}</li>
+                <li>Sentimen Positif: ${data.positive_count || 0} tweets (${data.positive_percent || 0}%)</li>
+                <li>Sentimen Netral: ${data.neutral_count || 0} tweets (${data.neutral_percent || 0}%)</li>
+                <li>Sentimen Negatif: ${data.negative_count || 0} tweets (${data.negative_percent || 0}%)</li>
             </ul>
             <p>Silakan pilih topik di bawah ini atau ajukan pertanyaan Anda sendiri.</p>
         `;
@@ -972,654 +899,70 @@ document.addEventListener('DOMContentLoaded', function() {
         // Scroll to bottom
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
     }
-    
-    // Function to create sentiment by hashtag chart
-    function createSentimentByHashtagChart(hashtagSentimentData) {
-        const chartContainer = document.getElementById('sentiment-by-hashtag-chart');
-        if (!chartContainer || !hashtagSentimentData || hashtagSentimentData.length === 0) return;
-        
-        // Add loading indicator
-        chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
-        
-        // Take top 5 hashtags by total count
-        const top5Hashtags = hashtagSentimentData
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5);
-        
-        const labels = top5Hashtags.map(item => item.tag);
-        const positiveData = top5Hashtags.map(item => item.positive);
-        const neutralData = top5Hashtags.map(item => item.neutral);
-        const negativeData = top5Hashtags.map(item => item.negative);
-        
-        // Create chart
-        const ctx = document.createElement('canvas');
-        chartContainer.innerHTML = '';
-        chartContainer.appendChild(ctx);
-        
-        // Destroy previous chart instance if exists
-        if (sentimentByHashtagChart) {
-            sentimentByHashtagChart.destroy();
-        }
-        
-        // Create new chart
-        sentimentByHashtagChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Positif',
-                        data: positiveData,
-                        backgroundColor: '#ffffff',
-                        borderColor: '#dddddd',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Netral',
-                        data: neutralData,
-                        backgroundColor: '#9e9e9e',
-                        borderColor: '#757575',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Negatif',
-                        data: negativeData,
-                        backgroundColor: '#000000',
-                        borderColor: '#000000',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Hashtag',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Persentase (%)',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Sentimen Berdasarkan Hashtag (Top 5)',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            bottom: 15
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.raw + '%';
-                            }
-                        }
-                    }
-                },
-                animation: {
-                    duration: 1000,
-                    easing: 'easeOutQuart'
-                }
-            }
-        });
-    }
-    
-    // Create sentiment by location chart
-    function createSentimentByLocationChart(tweetsData) {
-        const chartContainer = document.getElementById('sentiment-by-location-chart');
-        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
-        
-        // Add loading indicator
-        chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
-        
-        // Group tweets by location and sentiment
-        const locationData = {};
-        
-        tweetsData.forEach(tweet => {
-            if (tweet.location) {
-                if (!locationData[tweet.location]) {
-                    locationData[tweet.location] = {
-                        Positif: 0,
-                        Netral: 0,
-                        Negatif: 0,
-                        total: 0
-                    };
-                }
-                
-                locationData[tweet.location][tweet.predicted_sentiment]++;
-                locationData[tweet.location].total++;
-            }
-        });
-        
-        // Convert to array and sort by total
-        const locationArray = Object.entries(locationData)
-            .map(([location, data]) => ({
-                location,
-                ...data,
-                positivePercent: (data.Positif / data.total * 100).toFixed(1),
-                neutralPercent: (data.Netral / data.total * 100).toFixed(1),
-                negativePercent: (data.Negatif / data.total * 100).toFixed(1)
-            }))
-            .filter(item => item.total >= 2) // Filter locations with at least 2 tweets
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5); // Take top 5
-        
-        if (locationArray.length === 0) {
-            chartContainer.innerHTML = '<p class="text-center text-muted my-5">Data lokasi tidak cukup untuk menampilkan grafik.</p>';
-            return;
-        }
-        
-        const labels = locationArray.map(item => item.location);
-        const positiveData = locationArray.map(item => parseFloat(item.positivePercent));
-        const neutralData = locationArray.map(item => parseFloat(item.neutralPercent));
-        const negativeData = locationArray.map(item => parseFloat(item.negativePercent));
-        
-        // Create chart
-        const ctx = document.createElement('canvas');
-        chartContainer.innerHTML = '';
-        chartContainer.appendChild(ctx);
-        
-        // Destroy previous chart instance if exists
-        if (sentimentByLocationChart) {
-            sentimentByLocationChart.destroy();
-        }
-        
-        // Create new chart
-        sentimentByLocationChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Positif',
-                        data: positiveData,
-                        backgroundColor: '#ffffff',
-                        borderColor: '#dddddd',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Netral',
-                        data: neutralData,
-                        backgroundColor: '#9e9e9e',
-                        borderColor: '#757575',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Negatif',
-                        data: negativeData,
-                        backgroundColor: '#000000',
-                        borderColor: '#000000',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Lokasi',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Persentase (%)',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Sentimen Berdasarkan Lokasi (Top 5)',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            bottom: 15
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.raw + '%';
-                            },
-                            afterLabel: function(context) {
-                                const index = context.dataIndex;
-                                const locationItem = locationArray[index];
-                                return 'Total tweets: ' + locationItem.total;
-                            }
-                        }
-                    }
-                },
-                animation: {
-                    duration: 1200,
-                    easing: 'easeOutQuart'
-                }
-            }
-        });
-    }
-    
-    // Create sentiment by language chart
-    function createSentimentByLanguageChart(tweetsData) {
-        const chartContainer = document.getElementById('sentiment-by-language-chart');
-        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
-        
-        // Add loading indicator
-        chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
-        
-        // Group tweets by language and sentiment
-        const languageData = {};
-        const languageNames = {
-            'in': 'Indonesia',
-            'en': 'English',
-            'id': 'Indonesia',
-            'qme': 'Quechua',
-            'und': 'Undefined',
-            'ar': 'Arabic',
-            'fr': 'French',
-            'es': 'Spanish',
-            'de': 'German'
-        };
-        
-        tweetsData.forEach(tweet => {
-            if (tweet.lang) {
-                if (!languageData[tweet.lang]) {
-                    languageData[tweet.lang] = {
-                        Positif: 0,
-                        Netral: 0,
-                        Negatif: 0,
-                        total: 0
-                    };
-                }
-                
-                languageData[tweet.lang][tweet.predicted_sentiment]++;
-                languageData[tweet.lang].total++;
-            }
-        });
-        
-        // Convert to array and sort by total
-        const languageArray = Object.entries(languageData)
-            .map(([lang, data]) => ({
-                lang,
-                langName: languageNames[lang] || lang,
-                ...data,
-                positivePercent: (data.Positif / data.total * 100).toFixed(1),
-                neutralPercent: (data.Netral / data.total * 100).toFixed(1),
-                negativePercent: (data.Negatif / data.total * 100).toFixed(1)
-            }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5); // Take top 5
-        
-        const labels = languageArray.map(item => item.langName);
-        const positiveData = languageArray.map(item => parseFloat(item.positivePercent));
-        const neutralData = languageArray.map(item => parseFloat(item.neutralPercent));
-        const negativeData = languageArray.map(item => parseFloat(item.negativePercent));
-        
-        // Create chart
-        const ctx = document.createElement('canvas');
-        chartContainer.innerHTML = '';
-        chartContainer.appendChild(ctx);
-        
-        // Destroy previous chart instance if exists
-        if (sentimentByLanguageChart) {
-            sentimentByLanguageChart.destroy();
-        }
-        
-        // Create new chart
-        sentimentByLanguageChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Positif',
-                        data: positiveData,
-                        backgroundColor: '#ffffff',
-                        borderColor: '#dddddd',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Netral',
-                        data: neutralData,
-                        backgroundColor: '#9e9e9e',
-                        borderColor: '#757575',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Negatif',
-                        data: negativeData,
-                        backgroundColor: '#000000',
-                        borderColor: '#000000',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Bahasa',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    },
-                    y: {
-                        stacked: true,
-                        title: {
-                            display: true,
-                            text: 'Persentase (%)',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Sentimen Berdasarkan Bahasa (Top 5)',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            bottom: 15
-                        }
-                    },
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.raw + '%';
-                            },
-                            afterLabel: function(context) {
-                                const index = context.dataIndex;
-                                const languageItem = languageArray[index];
-                                return 'Total tweets: ' + languageItem.total;
-                            }
-                        }
-                    }
-                },
-                animation: {
-                    duration: 1400,
-                    easing: 'easeOutQuart'
-                }
-            }
-        });
-    }
-    
-    // Create top words charts for each sentiment
-    function createTopWordsCharts(sentimentWords) {
-        if (!sentimentWords) return;
-        
-        createWordFrequencyChart('positive-words-chart', sentimentWords.positive, 'Kata Umum dalam Sentimen Positif', '#ffffff');
-        createWordFrequencyChart('neutral-words-chart', sentimentWords.neutral, 'Kata Umum dalam Sentimen Netral', '#9e9e9e');
-        createWordFrequencyChart('negative-words-chart', sentimentWords.negative, 'Kata Umum dalam Sentimen Negatif', '#000000');
-    }
-    
-    // Create word frequency chart with enhanced animations
-    function createWordFrequencyChart(containerId, wordFrequencies, title, color) {
-        const chartContainer = document.getElementById(containerId);
-        if (!chartContainer || !wordFrequencies || wordFrequencies.length === 0) {
-            if (chartContainer) {
-                chartContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan grafik ini.</p>';
+
+    function saveAnalysisToHistory(autoSave = false) {
+        // Check if analysis results exist
+        if (!analysisResults) {
+            if (!autoSave) {
+                showAlert('Tidak ada data analisis yang tersedia untuk disimpan', 'warning');
             }
             return;
         }
         
-        // Add loading indicator
-        chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
-        
-        // Prepare data for chart
-        const wordsArray = wordFrequencies
-            .map(item => ({ word: item.word, count: item.count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 10);
-        
-        const labels = wordsArray.map(item => item.word);
-        const data = wordsArray.map(item => item.count);
-        
-        // Create chart
-        const ctx = document.createElement('canvas');
-        chartContainer.innerHTML = '';
-        chartContainer.appendChild(ctx);
-        
-        // Determine text color based on background color
-        let textColor = '#000000';
-        if (color === '#000000') {
-            textColor = '#ffffff';
+        // Check if user is logged in
+        const userIsLoggedIn = document.querySelector('.dropdown-item[href*="profile"]') !== null;
+        if (!userIsLoggedIn) {
+            if (!autoSave) {
+                showAlert('Silakan login terlebih dahulu untuk menyimpan analisis', 'warning');
+            }
+            return;
         }
         
-        // Get chart instance based on container ID
-        let chartInstance;
-        if (containerId === 'positive-words-chart') {
-            // Destroy previous chart instance if exists
-            if (positiveWordsChart) {
-                positiveWordsChart.destroy();
-            }
-            
-            // Create new chart
-            chartInstance = positiveWordsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Frekuensi',
-                            data: data,
-                            backgroundColor: color,
-                            borderColor: '#333333',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: getWordChartOptions(title, textColor)
-            });
-        } else if (containerId === 'neutral-words-chart') {
-            // Destroy previous chart instance if exists
-            if (neutralWordsChart) {
-                neutralWordsChart.destroy();
-            }
-            
-            // Create new chart
-            chartInstance = neutralWordsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Frekuensi',
-                            data: data,
-                            backgroundColor: color,
-                            borderColor: '#333333',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: getWordChartOptions(title, textColor)
-            });
-        } else if (containerId === 'negative-words-chart') {
-            // Destroy previous chart instance if exists
-            if (negativeWordsChart) {
-                negativeWordsChart.destroy();
-            }
-            
-            // Create new chart
-            chartInstance = negativeWordsChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        {
-                            label: 'Frekuensi',
-                            data: data,
-                            backgroundColor: color,
-                            borderColor: '#333333',
-                            borderWidth: 1
-                        }
-                    ]
-                },
-                options: getWordChartOptions(title, textColor)
-            });
+        // Create form data
+        const formData = new FormData();
+        formData.append('original_file', session.get('original_file', ''));
+        
+        // Add sentiment plot if available
+        const sentimentPlot = document.getElementById('sentiment-plot');
+        if (sentimentPlot && sentimentPlot.src) {
+            formData.append('sentiment_plot', sentimentPlot.src);
         }
         
-        return chartInstance;
+        // Send to server
+        fetch('/history/save', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (response.ok) {
+                if (!autoSave) {
+                    showAlert('Analisis berhasil disimpan ke riwayat', 'success');
+                }
+            } else {
+                if (!autoSave) {
+                    showAlert('Gagal menyimpan analisis', 'danger');
+                }
+            }
+        })
+        .catch(error => {
+            if (!autoSave) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        });
     }
-    
-    // Helper function for word frequency chart options
-    function getWordChartOptions(title, textColor) {
-        return {
-            indexAxis: 'y',
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Frekuensi',
-                        font: {
-                            weight: 'bold'
-                        }
-                    },
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                y: {
-                    title: {
-                        display: false
-                    },
-                    grid: {
-                        display: false
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: title,
-                    font: {
-                        size: 16,
-                        weight: 'bold'
-                    },
-                    padding: {
-                        bottom: 15
-                    }
-                },
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return 'Frekuensi: ' + context.raw;
-                        }
-                    }
-                }
-            },
-            animation: {
-                delay: function(context) {
-                    return context.dataIndex * 100;
-                },
-                duration: 1000,
-                easing: 'easeOutQuart'
-            }
-        };
+
+    const manualSaveBtn = document.getElementById('save-analysis-btn');
+    if (manualSaveBtn) {
+        manualSaveBtn.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent form submission
+            saveAnalysisToHistory(false); // Manual save with notifications
+        });
     }
     
     // Function to send message to chatbot
     function sendChatbotMessage() {
+        if (!chatbotInput || !chatbotMessages) return;
+        
         const messageText = chatbotInput.value.trim();
         
         if (!messageText) return;
@@ -1653,10 +996,12 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             // Remove loading message
-            chatbotMessages.removeChild(loadingMessage);
+            if (chatbotMessages.contains(loadingMessage)) {
+                chatbotMessages.removeChild(loadingMessage);
+            }
             
             // Format the response text with proper line breaks and formatting
-            const formattedResponse = formatChatbotResponse(data.response);
+            const formattedResponse = formatChatbotResponse(data.response || '');
             
             // Add bot response with animation
             const botMessage = document.createElement('div');
@@ -1669,7 +1014,9 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             // Remove loading message
-            chatbotMessages.removeChild(loadingMessage);
+            if (chatbotMessages.contains(loadingMessage)) {
+                chatbotMessages.removeChild(loadingMessage);
+            }
             
             // Add error message
             const errorMessage = document.createElement('div');
@@ -1721,10 +1068,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!alertContainer) return;
         
         const alert = document.createElement('div');
-        alert.className = `alert alert-${type} alert-dismissible fade show animate-fade-in`;
+        alert.className = `alert alert-${type || 'info'} alert-dismissible fade show animate-fade-in`;
         alert.role = 'alert';
         alert.innerHTML = `
-            ${message}
+            ${message || ''}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         `;
         
@@ -1732,9 +1079,837 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Auto remove after 5 seconds
         setTimeout(() => {
-            alert.classList.remove('show');
-            setTimeout(() => alert.remove(), 300);
+            if (alert.classList) {
+                alert.classList.remove('show');
+                setTimeout(() => {
+                    if (alert.parentNode === alertContainer) {
+                        alertContainer.removeChild(alert);
+                    }
+                }, 300);
+            }
         }, 5000);
+    }
+    
+    // Create improved word cloud
+    function createImprovedWordCloud(data) {
+        const wordCloudContainer = document.getElementById('word-cloud-container');
+        if (!wordCloudContainer || !data || !data.tweets || data.tweets.length === 0) return;
+        
+        // Add loading indicator
+        wordCloudContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+        
+        try {
+            // Check if d3 is available
+            if (typeof d3 === 'undefined' || !d3.layout || !d3.layout.cloud) {
+                wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Library D3 tidak tersedia untuk membuat word cloud.</p>';
+                return;
+            }
+            
+            // Create word frequency counts
+            const wordFrequencies = {};
+            
+            // Stopwords to filter out (expanded list)
+            const stopwords = [
+                'yang', 'dan', 'di', 'dengan', 'untuk', 'pada', 'adalah', 'ini', 'itu', 'atau', 'juga',
+                'dari', 'akan', 'ke', 'karena', 'oleh', 'saat', 'dalam', 'secara', 'telah', 'sebagai',
+                'bahwa', 'dapat', 'para', 'harus', 'namun', 'seperti', 'hingga', 'tak', 'tidak', 'tapi',
+                'kita', 'kami', 'saya', 'mereka', 'dia', 'http', 'https', 'co', 't', 'a', 'amp', 'rt',
+                'nya', 'yg', 'dgn', 'utk', 'dr', 'pd', 'jd', 'sdh', 'tdk', 'bisa', 'ada', 'kalo', 'bgt',
+                'aja', 'gitu', 'gak', 'mau', 'biar', 'kan', 'klo', 'deh', 'sih', 'nya', 'nih', 'loh'
+            ];
+            
+            // Process each tweet to extract words
+            data.tweets.forEach(tweet => {
+                if (!tweet.content) return;
+                
+                // Extract words from content
+                let content = tweet.content.toLowerCase();
+                
+                // Remove URLs
+                content = content.replace(/https?:\/\/[^\s]+/g, '');
+                
+                // Remove special characters and emoji
+                content = content.replace(/[^\w\s]/g, ' ');
+                
+                // Split into words
+                const words = content.split(/\s+/);
+                
+                // Filter words
+                const filteredWords = words.filter(word => 
+                    word.length > 3 &&  // Filter words with length > 3
+                    !stopwords.includes(word) &&  // Filter out stopwords
+                    !/^\d+$/.test(word)  // Filter out numbers
+                );
+                
+                // Count word frequencies
+                filteredWords.forEach(word => {
+                    wordFrequencies[word] = (wordFrequencies[word] || 0) + 1;
+                });
+            });
+            
+            // Convert to array for word cloud
+            const wordsArray = Object.entries(wordFrequencies)
+                .map(([text, value]) => ({ text, value }))
+                .filter(item => item.value > 1)  // Filter words that appear more than once
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 100);  // Limit to top 100 words
+            
+            if (wordsArray.length === 0) {
+                wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan word cloud.</p>';
+                return;
+            }
+            
+            // Normalize word sizes between minSize and maxSize
+            const minCount = Math.min(...wordsArray.map(w => w.value));
+            const maxCount = Math.max(...wordsArray.map(w => w.value));
+            const minSize = 12;
+            const maxSize = 60;
+            
+            // Adjust word sizes
+            wordsArray.forEach(word => {
+                // Normalize size
+                const size = minSize + ((word.value - minCount) / (maxCount - minCount || 1)) * (maxSize - minSize);
+                word.size = size;
+                
+                // Assign a color based on sentiment association
+                // Use a black/gray scale for the monochrome theme
+                const intensity = Math.round((word.value - minCount) / (maxCount - minCount || 1) * 200);
+                word.color = `rgb(${intensity}, ${intensity}, ${intensity})`;
+            });
+            
+            try {
+                // Use an alternative approach if d3.layout.cloud setup fails
+                wordCloudContainer.innerHTML = '<h4 class="text-center my-3">Top Words</h4><div class="d-flex flex-wrap justify-content-center align-items-center"></div>';
+                const wordContainer = wordCloudContainer.querySelector('div');
+                
+                wordsArray.slice(0, 50).forEach((word, index) => {
+                    const wordSpan = document.createElement('span');
+                    wordSpan.textContent = word.text;
+                    wordSpan.style.fontSize = `${word.size / 10}rem`;
+                    wordSpan.style.fontWeight = Math.min(900, 300 + Math.floor(word.size * 10));
+                    wordSpan.style.color = word.color;
+                    wordSpan.style.padding = '5px';
+                    wordSpan.style.margin = '3px';
+                    wordSpan.style.display = 'inline-block';
+                    wordSpan.style.transition = 'all 0.3s ease';
+                    wordSpan.style.opacity = 0;
+                    wordSpan.style.transform = 'translateY(20px)';
+                    
+                    wordSpan.addEventListener('mouseover', function() {
+                        this.style.transform = 'scale(1.2)';
+                        this.style.color = '#000000';
+                    });
+                    
+                    wordSpan.addEventListener('mouseout', function() {
+                        this.style.transform = 'scale(1)';
+                        this.style.color = word.color;
+                    });
+                    
+                    wordContainer.appendChild(wordSpan);
+                    
+                    // Animate entrance with delay based on index
+                    setTimeout(() => {
+                        wordSpan.style.opacity = 1;
+                        wordSpan.style.transform = 'translateY(0)';
+                    }, 50 * index);
+                });
+            } catch (innerError) {
+                console.error("Inner error creating word cloud:", innerError);
+                wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi word cloud.</p>';
+            }
+        } catch (error) {
+            console.error("Error creating word cloud:", error);
+            wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi word cloud.</p>';
+        }
+    }
+    
+    // Function to create sentiment by hashtag chart
+    function createSentimentByHashtagChart(hashtagSentimentData) {
+        if (typeof Chart === 'undefined') return;
+        
+        const chartContainer = document.getElementById('sentiment-by-hashtag-chart');
+        if (!chartContainer || !hashtagSentimentData || hashtagSentimentData.length === 0) return;
+        
+        // Add loading indicator
+        chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+        
+        try {
+            // Take top 5 hashtags by total count
+            const top5Hashtags = hashtagSentimentData
+                .sort((a, b) => (b.total || 0) - (a.total || 0))
+                .slice(0, 5);
+            
+            const labels = top5Hashtags.map(item => item.tag || '');
+            const positiveData = top5Hashtags.map(item => item.positive || 0);
+            const neutralData = top5Hashtags.map(item => item.neutral || 0);
+            const negativeData = top5Hashtags.map(item => item.negative || 0);
+            
+            // Create chart
+            const ctx = document.createElement('canvas');
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(ctx);
+            
+            // Destroy previous chart instance if exists
+            if (sentimentByHashtagChart) {
+                sentimentByHashtagChart.destroy();
+            }
+            
+            // Create new chart
+            sentimentByHashtagChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Positif',
+                            data: positiveData,
+                            backgroundColor: '#ffffff',
+                            borderColor: '#dddddd',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Netral',
+                            data: neutralData,
+                            backgroundColor: '#9e9e9e',
+                            borderColor: '#757575',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Negatif',
+                            data: negativeData,
+                            backgroundColor: '#000000',
+                            borderColor: '#000000',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Hashtag',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Persentase (%)',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sentimen Berdasarkan Hashtag (Top 5)',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                bottom: 15
+                            }
+                        },
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.raw + '%';
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error creating sentiment by hashtag chart:", error);
+            chartContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi chart.</p>';
+        }
+    }
+    
+    // Create sentiment by location chart
+    function createSentimentByLocationChart(tweetsData) {
+        if (typeof Chart === 'undefined') return;
+        
+        const chartContainer = document.getElementById('sentiment-by-location-chart');
+        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
+        
+        try {
+            // Add loading indicator
+            chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+            
+            // Group tweets by location and sentiment
+            const locationData = {};
+            
+            tweetsData.forEach(tweet => {
+                if (tweet.location) {
+                    if (!locationData[tweet.location]) {
+                        locationData[tweet.location] = {
+                            Positif: 0,
+                            Netral: 0,
+                            Negatif: 0,
+                            total: 0
+                        };
+                    }
+                    
+                    if (tweet.predicted_sentiment) {
+                        locationData[tweet.location][tweet.predicted_sentiment]++;
+                    }
+                    locationData[tweet.location].total++;
+                }
+            });
+            
+            // Convert to array and sort by total
+            const locationArray = Object.entries(locationData)
+                .map(([location, data]) => ({
+                    location,
+                    ...data,
+                    positivePercent: (data.Positif / (data.total || 1) * 100).toFixed(1),
+                    neutralPercent: (data.Netral / (data.total || 1) * 100).toFixed(1),
+                    negativePercent: (data.Negatif / (data.total || 1) * 100).toFixed(1)
+                }))
+                .filter(item => (item.total || 0) >= 2) // Filter locations with at least 2 tweets
+                .sort((a, b) => (b.total || 0) - (a.total || 0))
+                .slice(0, 5); // Take top 5
+            
+            if (locationArray.length === 0) {
+                chartContainer.innerHTML = '<p class="text-center text-muted my-5">Data lokasi tidak cukup untuk menampilkan grafik.</p>';
+                return;
+            }
+            
+            const labels = locationArray.map(item => item.location || '');
+            const positiveData = locationArray.map(item => parseFloat(item.positivePercent || 0));
+            const neutralData = locationArray.map(item => parseFloat(item.neutralPercent || 0));
+            const negativeData = locationArray.map(item => parseFloat(item.negativePercent || 0));
+            
+            // Create chart
+            const ctx = document.createElement('canvas');
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(ctx);
+            
+            // Destroy previous chart instance if exists
+            if (sentimentByLocationChart) {
+                sentimentByLocationChart.destroy();
+            }
+            
+            // Create new chart
+            sentimentByLocationChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Positif',
+                            data: positiveData,
+                            backgroundColor: '#ffffff',
+                            borderColor: '#dddddd',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Netral',
+                            data: neutralData,
+                            backgroundColor: '#9e9e9e',
+                            borderColor: '#757575',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Negatif',
+                            data: negativeData,
+                            backgroundColor: '#000000',
+                            borderColor: '#000000',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Lokasi',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Persentase (%)',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sentimen Berdasarkan Lokasi (Top 5)',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                bottom: 15
+                            }
+                        },
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.raw + '%';
+                                },
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    const locationItem = locationArray[index];
+                                    return 'Total tweets: ' + (locationItem?.total || 0);
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1200,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error creating sentiment by location chart:", error);
+            chartContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi chart.</p>';
+        }
+    }
+    
+    // Create sentiment by language chart
+    function createSentimentByLanguageChart(tweetsData) {
+        if (typeof Chart === 'undefined') return;
+        
+        const chartContainer = document.getElementById('sentiment-by-language-chart');
+        if (!chartContainer || !tweetsData || tweetsData.length === 0) return;
+        
+        try {
+            // Add loading indicator
+            chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+            
+            // Group tweets by language and sentiment
+            const languageData = {};
+            const languageNames = {
+                'in': 'Indonesia',
+                'en': 'English',
+                'id': 'Indonesia',
+                'qme': 'Quechua',
+                'und': 'Undefined',
+                'ar': 'Arabic',
+                'fr': 'French',
+                'es': 'Spanish',
+                'de': 'German'
+            };
+            
+            tweetsData.forEach(tweet => {
+                if (tweet.lang) {
+                    if (!languageData[tweet.lang]) {
+                        languageData[tweet.lang] = {
+                            Positif: 0,
+                            Netral: 0,
+                            Negatif: 0,
+                            total: 0
+                        };
+                    }
+                    
+                    if (tweet.predicted_sentiment) {
+                        languageData[tweet.lang][tweet.predicted_sentiment]++;
+                    }
+                    languageData[tweet.lang].total++;
+                }
+            });
+            
+            // Convert to array and sort by total
+            const languageArray = Object.entries(languageData)
+                .map(([lang, data]) => ({
+                    lang,
+                    langName: languageNames[lang] || lang,
+                    ...data,
+                    positivePercent: (data.Positif / (data.total || 1) * 100).toFixed(1),
+                    neutralPercent: (data.Netral / (data.total || 1) * 100).toFixed(1),
+                    negativePercent: (data.Negatif / (data.total || 1) * 100).toFixed(1)
+                }))
+                .sort((a, b) => (b.total || 0) - (a.total || 0))
+                .slice(0, 5); // Take top 5
+            
+            const labels = languageArray.map(item => item.langName || '');
+            const positiveData = languageArray.map(item => parseFloat(item.positivePercent || 0));
+            const neutralData = languageArray.map(item => parseFloat(item.neutralPercent || 0));
+            const negativeData = languageArray.map(item => parseFloat(item.negativePercent || 0));
+            
+            // Create chart
+            const ctx = document.createElement('canvas');
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(ctx);
+            
+            // Destroy previous chart instance if exists
+            if (sentimentByLanguageChart) {
+                sentimentByLanguageChart.destroy();
+            }
+            
+            // Create new chart
+            sentimentByLanguageChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Positif',
+                            data: positiveData,
+                            backgroundColor: '#ffffff',
+                            borderColor: '#dddddd',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Netral',
+                            data: neutralData,
+                            backgroundColor: '#9e9e9e',
+                            borderColor: '#757575',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Negatif',
+                            data: negativeData,
+                            backgroundColor: '#000000',
+                            borderColor: '#000000',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Bahasa',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Persentase (%)',
+                                font: {
+                                    weight: 'bold'
+                                }
+                            },
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sentimen Berdasarkan Bahasa (Top 5)',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            },
+                            padding: {
+                                bottom: 15
+                            }
+                        },
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.raw + '%';
+                                },
+                                afterLabel: function(context) {
+                                    const index = context.dataIndex;
+                                    const languageItem = languageArray[index];
+                                    return 'Total tweets: ' + (languageItem?.total || 0);
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1400,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        } catch (error) {
+            console.error("Error creating sentiment by language chart:", error);
+            chartContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi chart.</p>';
+        }
+    }
+    
+    // Create top words charts for each sentiment
+    function createTopWordsCharts(sentimentWords) {
+        if (!sentimentWords) return;
+        
+        createWordFrequencyChart('positive-words-chart', sentimentWords.positive, 'Kata Umum dalam Sentimen Positif', '#ffffff');
+        createWordFrequencyChart('neutral-words-chart', sentimentWords.neutral, 'Kata Umum dalam Sentimen Netral', '#9e9e9e');
+        createWordFrequencyChart('negative-words-chart', sentimentWords.negative, 'Kata Umum dalam Sentimen Negatif', '#000000');
+    }
+    
+    // Create word frequency chart with enhanced animations
+    function createWordFrequencyChart(containerId, wordFrequencies, title, color) {
+        if (typeof Chart === 'undefined') return;
+        
+        const chartContainer = document.getElementById(containerId);
+        if (!chartContainer || !wordFrequencies || !Array.isArray(wordFrequencies) || wordFrequencies.length === 0) {
+            if (chartContainer) {
+                chartContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan grafik ini.</p>';
+            }
+            return;
+        }
+        
+        try {
+            // Add loading indicator
+            chartContainer.innerHTML = '<div class="chart-loader"><div class="spinner"></div></div>';
+            
+            // Prepare data for chart
+            const wordsArray = wordFrequencies
+                .filter(item => item && item.word && item.count)
+                .map(item => ({ word: item.word, count: item.count }))
+                .sort((a, b) => (b.count || 0) - (a.count || 0))
+                .slice(0, 10);
+            
+            if (wordsArray.length === 0) {
+                chartContainer.innerHTML = '<p class="text-center text-muted my-5">Tidak cukup data untuk menampilkan grafik ini.</p>';
+                return;
+            }
+            
+            const labels = wordsArray.map(item => item.word || '');
+            const data = wordsArray.map(item => item.count || 0);
+            
+            // Create chart
+            const ctx = document.createElement('canvas');
+            chartContainer.innerHTML = '';
+            chartContainer.appendChild(ctx);
+            
+            // Determine text color based on background color
+            let textColor = '#000000';
+            if (color === '#000000') {
+                textColor = '#ffffff';
+            }
+            
+            // Get chart options
+            const chartOptions = getWordChartOptions(title || '', textColor);
+            
+            // Get chart instance based on container ID
+            let chartInstance;
+            if (containerId === 'positive-words-chart') {
+                // Destroy previous chart instance if exists
+                if (positiveWordsChart) {
+                    positiveWordsChart.destroy();
+                }
+                
+                // Create new chart
+                chartInstance = positiveWordsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Frekuensi',
+                                data: data,
+                                backgroundColor: color || '#333333',
+                                borderColor: '#333333',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: chartOptions
+                });
+            } else if (containerId === 'neutral-words-chart') {
+                // Destroy previous chart instance if exists
+                if (neutralWordsChart) {
+                    neutralWordsChart.destroy();
+                }
+                
+                // Create new chart
+                chartInstance = neutralWordsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Frekuensi',
+                                data: data,
+                                backgroundColor: color || '#333333',
+                                borderColor: '#333333',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: chartOptions
+                });
+            } else if (containerId === 'negative-words-chart') {
+                // Destroy previous chart instance if exists
+                if (negativeWordsChart) {
+                    negativeWordsChart.destroy();
+                }
+                
+                // Create new chart
+                chartInstance = negativeWordsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Frekuensi',
+                                data: data,
+                                backgroundColor: color || '#333333',
+                                borderColor: '#333333',
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: chartOptions
+                });
+            }
+            
+            return chartInstance;
+        } catch (error) {
+            console.error(`Error creating chart for ${containerId}:`, error);
+            if (chartContainer) {
+                chartContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi chart.</p>';
+            }
+            return null;
+        }
+    }
+    
+    // Helper function for word frequency chart options
+    function getWordChartOptions(title, textColor) {
+        return {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Frekuensi',
+                        font: {
+                            weight: 'bold'
+                        }
+                    },
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                y: {
+                    title: {
+                        display: false
+                    },
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: title || '',
+                    font: {
+                        size: 16,
+                        weight: 'bold'
+                    },
+                    padding: {
+                        bottom: 15
+                    }
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'Frekuensi: ' + (context.raw || 0);
+                        }
+                    }
+                }
+            },
+            animation: {
+                delay: function(context) {
+                    return (context.dataIndex || 0) * 100;
+                },
+                duration: 1000,
+                easing: 'easeOutQuart'
+            }
+        };
     }
     
     // Add support for example questions in chatbot.html

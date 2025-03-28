@@ -30,8 +30,8 @@
                     <div class="card-body">
                         <p><strong>Total Analisis:</strong> {{ current_user.histories.count() }}</p>
                         <p><strong>Analisis Terakhir:</strong> 
-                            {% if current_user.histories.order_by(models.AnalysisHistory.created_at.desc()).first() %}
-                                {{ current_user.histories.order_by(models.AnalysisHistory.created_at.desc()).first().created_at.strftime('%d %B %Y, %H:%M') }}
+                            {% if last_analysis %}
+                                {{ last_analysis.created_at.strftime('%d %B %Y, %H:%M') }}
                             {% else %}
                                 Belum ada analisis
                             {% endif %}

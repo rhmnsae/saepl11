@@ -1348,3 +1348,52 @@ footer h5 svg {
     margin: 2rem 0;
     animation: fadeIn 0.5s ease;
 }
+
+
+/* Perbaikan untuk navigasi */
+.main-tab-link, .nav-link {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+}
+
+.main-tab-link.active, .main-tab-link:hover, 
+.nav-link.active, .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-tab-link.disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.main-tab-link svg, .nav-link svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Pointer untuk link yang bisa diklik */
+.main-tab-link:not(.disabled), .nav-link {
+    cursor: pointer;
+}
+
+/* Gunakan !important untuk memastikan bahwa style tidak ditimpa */
+a.nav-link, a.main-tab-link {
+    color: white !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Pastikan link-link yang tidak disabled memiliki style yang benar */
+.nav-link:not(.disabled), .main-tab-link:not(.disabled) {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}

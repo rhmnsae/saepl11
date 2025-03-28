@@ -5,7 +5,7 @@
 {% block content %}
 <div class="content">
     <!-- Input Section -->
-    <section id="input" class="main-tab-content active">
+    <section id="input" class="main-tab-content {% if request.args.get('view', 'input') == 'input' %}active{% else %}d-none{% endif %}">
         <div class="card mb-4">
             <div class="card-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
@@ -46,12 +46,12 @@
     </section>
 
     <!-- Results Section (hidden until analysis is done) -->
-    <section id="results" class="main-tab-content d-none">
+    <section id="results" class="main-tab-content {% if request.args.get('view') == 'results' %}active{% else %}d-none{% endif %}">
         {% include 'results.html' %}
     </section>
     
     <!-- Evaluation Section with Chatbot -->
-    <section id="evaluation" class="main-tab-content d-none">
+    <section id="evaluation" class="main-tab-content {% if request.args.get('view') == 'evaluation' %}active{% else %}d-none{% endif %}">
         <div class="card">
             <div class="card-header">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -106,4 +106,51 @@
         </div>
     </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Direct manual tab switching when user clicks links in the navigation
+    const navLinks = document.querySelectorAll('.nav-tabs-link');
+    const sections = document.querySelectorAll('.main-tab-content');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            // Skip disabled links
+            if (this.classList.contains('disabled')) {
+                return;
+            }
+            
+            // Extract view parameter from the URL
+            const url = new URL(this.href);
+            const view = url.searchParams.get('view') || 'input';
+            
+            // Manually switch tabs without page reload if it's a tab within the same page
+            if (url.pathname === window.location.pathname) {
+                e.preventDefault();
+                
+                // Update active state in navigation
+                navLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Show the corresponding section
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                    section.classList.add('d-none');
+                });
+                
+                const targetSection = document.getElementById(view);
+                if (targetSection) {
+                    targetSection.classList.add('active');
+                    targetSection.classList.remove('d-none');
+                }
+                
+                // Update URL without page reload
+                window.history.pushState({}, '', url);
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
