@@ -665,76 +665,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Initialize chatbot
         initializeChatbot(data);
-
-        if (data.hasOwnProperty('saved_to_database')) {
-            const saveIndicator = document.getElementById('autosave-indicator');
-            if (saveIndicator) {
-                if (data.saved_to_database) {
-                    saveIndicator.classList.remove('d-none');
-                    saveIndicator.classList.add('alert-success');
-                } else {
-                    saveIndicator.classList.add('d-none');
-                    
-                    // Show manual save button if auto-save failed
-                    const saveButtonContainer = document.createElement('div');
-                    saveButtonContainer.className = 'alert alert-warning mb-3';
-                    saveButtonContainer.innerHTML = `
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <i class="bi bi-info-circle me-2"></i> 
-                                <strong>Penting:</strong> Penyimpanan otomatis gagal. Silakan simpan hasil analisis secara manual.
-                            </div>
-                            <button id="manual-save-btn" class="btn btn-dark">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                    <polyline points="7 3 7 8 15 8"></polyline>
-                                </svg>
-                                Simpan ke Riwayat
-                            </button>
-                        </div>
-                    `;
-                    
-                    // Insert before results
-                    const resultsContainer = document.querySelector('#results > .card');
-                    if (resultsContainer) {
-                        resultsContainer.prepend(saveButtonContainer);
-                        
-                        // Add event listener for manual save
-                        const manualSaveBtn = document.getElementById('manual-save-btn');
-                        if (manualSaveBtn) {
-                            manualSaveBtn.addEventListener('click', function() {
-                                // Create form for manual save
-                                const form = document.createElement('form');
-                                form.method = 'POST';
-                                form.action = '/history/save';
-                                
-                                // Add original file path
-                                const originalFileInput = document.createElement('input');
-                                originalFileInput.type = 'hidden';
-                                originalFileInput.name = 'original_file';
-                                originalFileInput.value = data.original_file || '';
-                                form.appendChild(originalFileInput);
-                                
-                                // Add sentiment plot
-                                const sentimentPlotInput = document.createElement('input');
-                                sentimentPlotInput.type = 'hidden';
-                                sentimentPlotInput.name = 'sentiment_plot';
-                                const sentimentPlot = document.getElementById('sentiment-plot');
-                                if (sentimentPlot && sentimentPlot.src) {
-                                    sentimentPlotInput.value = sentimentPlot.src;
-                                }
-                                form.appendChild(sentimentPlotInput);
-                                
-                                // Submit form
-                                document.body.appendChild(form);
-                                form.submit();
-                            });
-                        }
-                    }
-                }
-            }
-        }
     }
     
     // Helper function to update element text
@@ -898,65 +828,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Scroll to bottom
         chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
-    }
-
-    function saveAnalysisToHistory(autoSave = false) {
-        // Check if analysis results exist
-        if (!analysisResults) {
-            if (!autoSave) {
-                showAlert('Tidak ada data analisis yang tersedia untuk disimpan', 'warning');
-            }
-            return;
-        }
-        
-        // Check if user is logged in
-        const userIsLoggedIn = document.querySelector('.dropdown-item[href*="profile"]') !== null;
-        if (!userIsLoggedIn) {
-            if (!autoSave) {
-                showAlert('Silakan login terlebih dahulu untuk menyimpan analisis', 'warning');
-            }
-            return;
-        }
-        
-        // Create form data
-        const formData = new FormData();
-        formData.append('original_file', session.get('original_file', ''));
-        
-        // Add sentiment plot if available
-        const sentimentPlot = document.getElementById('sentiment-plot');
-        if (sentimentPlot && sentimentPlot.src) {
-            formData.append('sentiment_plot', sentimentPlot.src);
-        }
-        
-        // Send to server
-        fetch('/history/save', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => {
-            if (response.ok) {
-                if (!autoSave) {
-                    showAlert('Analisis berhasil disimpan ke riwayat', 'success');
-                }
-            } else {
-                if (!autoSave) {
-                    showAlert('Gagal menyimpan analisis', 'danger');
-                }
-            }
-        })
-        .catch(error => {
-            if (!autoSave) {
-                showAlert('Error: ' + error.message, 'danger');
-            }
-        });
-    }
-
-    const manualSaveBtn = document.getElementById('save-analysis-btn');
-    if (manualSaveBtn) {
-        manualSaveBtn.addEventListener('click', function(e) {
-            e.preventDefault(); // Prevent form submission
-            saveAnalysisToHistory(false); // Manual save with notifications
-        });
     }
     
     // Function to send message to chatbot
@@ -1222,6 +1093,82 @@ document.addEventListener('DOMContentLoaded', function() {
             wordCloudContainer.innerHTML = '<p class="text-center text-muted my-5">Gagal membuat visualisasi word cloud.</p>';
         }
     }
+
+
+    // Fungsi untuk mengecek apakah data analisis sudah dimuat dengan benar
+    function checkAnalysisDataLoaded() {
+        // Cek apakah data tweets tersedia
+        if (!allTweets || allTweets.length === 0) {
+            showAlert('Data analisis tidak termuat dengan benar. Coba lakukan analisis baru.', 'warning');
+            return false;
+        }
+        
+        // Cek keberadaan elemen-elemen kunci di hasil analisis
+        const titleElement = document.getElementById('title-placeholder');
+        const totalTweetsElement = document.getElementById('total-tweets');
+        
+        if ((!titleElement || !titleElement.textContent) || 
+            (!totalTweetsElement || totalTweetsElement.textContent === '0')) {
+            showAlert('Data analisis tidak lengkap. Beberapa informasi mungkin tidak ditampilkan dengan benar.', 'warning');
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Tambahkan fungsi untuk memulihkan analisis dari data yang disimpan di database
+    function recoverAnalysisFromHistory(historyId) {
+        showAlert('Mencoba memulihkan data analisis dari riwayat...', 'info');
+        
+        // Kirim permintaan AJAX untuk memuat data dari riwayat
+        fetch(`/history/show/${historyId}`)
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                } else {
+                    return response.json();
+                }
+            })
+            .then(data => {
+                if (data && data.success) {
+                    showAlert('Data analisis berhasil dipulihkan!', 'success');
+                    window.location.href = '/index?view=results';
+                } else if (data && data.error) {
+                    showAlert(`Gagal memulihkan data: ${data.error}`, 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert(`Terjadi kesalahan saat memulihkan data: ${error.message}`, 'danger');
+            });
+    }
+
+    // Tambahkan ini pada handler klik tombol "Lihat" di halaman riwayat
+    document.addEventListener('DOMContentLoaded', function() {
+        const viewHistoryButtons = document.querySelectorAll('.view-history-btn');
+        
+        viewHistoryButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                const historyId = this.getAttribute('data-history-id');
+                if (!historyId) return;
+                
+                // Tambahkan loading state
+                this.innerHTML = `
+                    <div class="spinner-border spinner-border-sm" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    Memuat...
+                `;
+                this.disabled = true;
+            });
+        });
+        
+        // Cek data analisis saat halaman muat (hanya untuk halaman hasil)
+        if (window.location.href.includes('view=results')) {
+            setTimeout(() => {
+                checkAnalysisDataLoaded();
+            }, 1000);
+        }
+    });
     
     // Function to create sentiment by hashtag chart
     function createSentimentByHashtagChart(hashtagSentimentData) {

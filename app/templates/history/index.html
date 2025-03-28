@@ -9,6 +9,9 @@
         <h2 class="card-title">Riwayat Analisis</h2>
     </div>
     <div class="card-body">
+        <!-- Alert untuk notifikasi status operasi -->
+        <div id="status-alert-container"></div>
+        
         {% if histories.items %}
             <div class="table-responsive">
                 <table class="table table-striped table-hover">
@@ -18,6 +21,7 @@
                             <th>Tanggal</th>
                             <th>Total Tweets</th>
                             <th>Sentimen Dominan</th>
+                            <th>Status</th>
                             <th>Aksi</th>
                         </tr>
                     </thead>
@@ -37,8 +41,17 @@
                                     {% endif %}
                                 </td>
                                 <td>
+                                    {% if history.result_file_path and history.file_path %}
+                                        <span class="badge bg-success">Lengkap</span>
+                                    {% elif history.result_file_path %}
+                                        <span class="badge bg-warning">Parsial</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Tidak Lengkap</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     <div class="btn-group" role="group">
-                                        <a href="{{ url_for('history.show', id=history.id) }}" class="btn btn-sm btn-primary">
+                                        <a href="{{ url_for('history.show', id=history.id) }}" class="btn btn-sm btn-primary view-history-btn" data-history-id="{{ history.id }}" data-bs-toggle="tooltip" title="Lihat dan muat analisis">
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                                             Lihat
                                         </a>
@@ -61,7 +74,7 @@
                                                 </div>
                                                 <div class="modal-footer">
                                                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                                                    <form action="{{ url_for('history.delete', id=history.id) }}" method="POST">
+                                                    <form action="{{ url_for('history.delete', id=history.id) }}" method="POST" class="delete-form" data-title="{{ history.title }}">
                                                         <button type="submit" class="btn btn-danger">Hapus</button>
                                                     </form>
                                                 </div>
@@ -138,4 +151,276 @@
         {% endif %}
     </div>
 </div>
+
+<!-- Modal untuk pesan error/loading saat membuka analisis -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-labelledby="loadingModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="loadingModalLabel">Memuat Data Analisis</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Mohon tunggu, sedang memuat data analisis...</p>
+                <div class="progress mt-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal untuk error saat data tidak ditemukan -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-labelledby="errorModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="errorModalLabel">Error</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="errorMessage">Data analisis tidak ditemukan atau tidak valid.</p>
+                <div id="errorDetails" class="alert alert-secondary mt-3 d-none">
+                    <small class="text-muted">Detail teknis akan ditampilkan di sini.</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                <button type="button" class="btn btn-primary" id="retryButton">Coba Lagi</button>
+                <a href="{{ url_for('main.index') }}" class="btn btn-success">Analisis Baru</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal konfirmasi saat analisis tidak lengkap -->
+<div class="modal fade" id="incompleteDataModal" tabindex="-1" aria-labelledby="incompleteDataModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="incompleteDataModalLabel">Peringatan</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex align-items-center mb-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-3 text-warning"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    <p class="mb-0">Data analisis ini mungkin tidak lengkap. Beberapa informasi mungkin hilang atau tidak valid.</p>
+                </div>
+                <p>Apakah Anda tetap ingin melanjutkan?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-warning" id="continueButton">Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript untuk halaman riwayat -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Inisialisasi tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+    
+    // Tambahkan handler untuk form delete
+    const deleteForms = document.querySelectorAll('.delete-form');
+    
+    deleteForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            // Tampilkan loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <div class="spinner-border spinner-border-sm me-1" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Menghapus...
+            `;
+            
+            // Simpan referensi ke form
+            const formRef = this;
+            const recordTitle = this.getAttribute('data-title');
+            
+            // Tambahkan listener untuk berhasil/gagalnya penghapusan
+            setTimeout(() => {
+                // Jika form masih ada di DOM, artinya penghapusan mungkin gagal
+                // Kita perlu melakukan pengecekan tambahan
+                if (document.body.contains(formRef) && submitBtn.disabled) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                    
+                    // Sembunyikan modal hapus
+                    const deleteModal = bootstrap.Modal.getInstance(formRef.closest('.modal'));
+                    if (deleteModal) {
+                        deleteModal.hide();
+                    }
+                    
+                    // Tampilkan pesan error
+                    showStatusAlert('Terjadi kesalahan saat menghapus data. Coba lagi nanti.', 'danger');
+                }
+            }, 5000);
+        });
+    });
+    
+    // Fungsi untuk menampilkan alert status
+    function showStatusAlert(message, type = 'info') {
+        const alertContainer = document.getElementById('status-alert-container');
+        if (alertContainer) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show`;
+            alert.role = 'alert';
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            alertContainer.appendChild(alert);
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                if (alert.parentNode === alertContainer) {
+                    alert.classList.remove('show');
+                    setTimeout(() => {
+                        if (alert.parentNode === alertContainer) {
+                            alertContainer.removeChild(alert);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+    }
+    
+    // Tambahkan handler untuk tombol Lihat
+    const viewButtons = document.querySelectorAll('.view-history-btn');
+    
+    viewButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault(); // Prevent default navigation
+            
+            // Get history ID
+            const historyId = this.getAttribute('data-history-id');
+            if (!historyId) return;
+            
+            // Show loading modal
+            const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+            loadingModal.show();
+            
+            // Tampilkan loading state pada tombol
+            this.innerHTML = `
+                <div class="spinner-border spinner-border-sm me-1" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                Memuat...
+            `;
+            this.disabled = true;
+            
+            // Simpan referensi ke button untuk digunakan nanti
+            const originalButton = this;
+            const originalHref = this.getAttribute('href');
+            
+            // Buat objek untuk menyimpan data
+            let timeoutId = null;
+            
+            // Jadwalkan reset tombol jika halaman tidak berubah dalam 10 detik
+            timeoutId = setTimeout(() => {
+                if (document.body.contains(originalButton) && originalButton.disabled) {
+                    originalButton.disabled = false;
+                    originalButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        Lihat
+                    `;
+                    
+                    // Hide loading modal
+                    loadingModal.hide();
+                    
+                    // Show error modal
+                    const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                    document.getElementById('errorMessage').textContent = 
+                        'Terjadi kesalahan saat memuat data analisis. Server tidak merespons dalam waktu yang ditentukan.';
+                    
+                    // Add retry functionality
+                    const retryButton = document.getElementById('retryButton');
+                    retryButton.onclick = function() {
+                        errorModal.hide();
+                        originalButton.click();
+                    };
+                    
+                    errorModal.show();
+                }
+            }, 10000);
+            
+            // Make AJAX request to check if analysis exists
+            fetch(originalHref, {
+                method: 'HEAD',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    // Analysis exists, redirect to view page
+                    clearTimeout(timeoutId);
+                    window.location.href = originalHref;
+                } else {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+            }).catch(error => {
+                clearTimeout(timeoutId);
+                
+                // Reset button
+                if (document.body.contains(originalButton)) {
+                    originalButton.disabled = false;
+                    originalButton.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        Lihat
+                    `;
+                }
+                
+                // Hide loading modal
+                loadingModal.hide();
+                
+                // Show error modal
+                const errorModal = new bootstrap.Modal(document.getElementById('errorModal'));
+                document.getElementById('errorMessage').textContent = 
+                    'Terjadi kesalahan saat memuat data analisis. File mungkin telah dihapus atau rusak.';
+                
+                // Show technical details
+                const errorDetails = document.getElementById('errorDetails');
+                errorDetails.classList.remove('d-none');
+                errorDetails.innerHTML = `<small class="text-muted">Error: ${error.message}</small>`;
+                
+                // Add retry functionality
+                const retryButton = document.getElementById('retryButton');
+                retryButton.onclick = function() {
+                    errorModal.hide();
+                    originalButton.click();
+                };
+                
+                errorModal.show();
+            });
+        });
+    });
+    
+    // Cek status parameter URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const message = urlParams.get('message');
+    
+    if (status && message) {
+        showStatusAlert(decodeURIComponent(message), status);
+        
+        // Bersihkan parameter URL
+        const url = new URL(window.location);
+        url.searchParams.delete('status');
+        url.searchParams.delete('message');
+        window.history.replaceState({}, '', url);
+    }
+});
+</script>
 {% endblock %}

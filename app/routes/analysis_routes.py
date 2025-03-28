@@ -37,7 +37,22 @@ def save_to_database(title, description, file_path, output_file, analysis_data, 
     if not current_user.is_authenticated:
         return False
 
-    # Extract required data
+    # Validasi file hasil analisis
+    if not output_file or not os.path.exists(output_file):
+        print(f"Error: File hasil analisis tidak ditemukan: {output_file}")
+        return False
+        
+    # Validasi ukuran file
+    try:
+        file_size = os.path.getsize(output_file)
+        if file_size == 0:
+            print(f"Error: File hasil analisis kosong: {output_file}")
+            return False
+    except Exception as e:
+        print(f"Error memeriksa file: {str(e)}")
+        return False
+
+    # Extract required data dengan nilai default
     positive_count = analysis_data.get('positive_count', 0)
     neutral_count = analysis_data.get('neutral_count', 0)
     negative_count = analysis_data.get('negative_count', 0)
@@ -48,11 +63,53 @@ def save_to_database(title, description, file_path, output_file, analysis_data, 
     top_hashtags = analysis_data.get('top_hashtags', [])
     topics = analysis_data.get('topics', [])
 
-    # Convert hashtags to proper format
-    hashtags_json = json.dumps([h.get('tag', h) if isinstance(h, dict) else h for h in top_hashtags[:10]])
+    # Pastikan nilai numerik valid
+    if not isinstance(positive_count, (int, float)) or positive_count < 0:
+        positive_count = 0
+    if not isinstance(neutral_count, (int, float)) or neutral_count < 0:
+        neutral_count = 0
+    if not isinstance(negative_count, (int, float)) or negative_count < 0:
+        negative_count = 0
+    if not isinstance(total_tweets, (int, float)) or total_tweets < 0:
+        total_tweets = 0
+        
+    # Validasi persentase
+    if not isinstance(positive_percent, (int, float)) or positive_percent < 0 or positive_percent > 100:
+        positive_percent = 0
+    if not isinstance(neutral_percent, (int, float)) or neutral_percent < 0 or neutral_percent > 100:
+        neutral_percent = 0
+    if not isinstance(negative_percent, (int, float)) or negative_percent < 0 or negative_percent > 100:
+        negative_percent = 0
+
+    # Convert hashtags to proper format dengan validasi
+    hashtags_json = "[]"
+    try:
+        if top_hashtags and isinstance(top_hashtags, list):
+            formatted_hashtags = []
+            for h in top_hashtags[:10]:  # Batasi ke 10 hashtag teratas
+                if isinstance(h, dict) and 'tag' in h:
+                    formatted_hashtags.append(h['tag'])
+                elif isinstance(h, str):
+                    formatted_hashtags.append(h)
+            hashtags_json = json.dumps(formatted_hashtags)
+    except Exception as e:
+        print(f"Error processing hashtags: {str(e)}")
+        hashtags_json = "[]"
     
-    # Convert topics to proper format
-    topics_json = json.dumps([t.get('topic', t) if isinstance(t, dict) else t for t in topics[:10]])
+    # Convert topics to proper format dengan validasi
+    topics_json = "[]"
+    try:
+        if topics and isinstance(topics, list):
+            formatted_topics = []
+            for t in topics[:10]:  # Batasi ke 10 topik teratas
+                if isinstance(t, dict) and 'topic' in t:
+                    formatted_topics.append(t['topic'])
+                elif isinstance(t, str):
+                    formatted_topics.append(t)
+            topics_json = json.dumps(formatted_topics)
+    except Exception as e:
+        print(f"Error processing topics: {str(e)}")
+        topics_json = "[]"
 
     # Check if analysis with the same title already exists for this user
     existing_analysis = AnalysisHistory.query.filter_by(
@@ -100,9 +157,12 @@ def save_to_database(title, description, file_path, output_file, analysis_data, 
 
         # Commit changes
         db.session.commit()
+        print(f"Analysis '{title}' successfully saved to database")
         return True
     except Exception as e:
         print(f"Error saving to database: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return False
 
