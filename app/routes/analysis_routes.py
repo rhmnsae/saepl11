@@ -328,7 +328,110 @@ def upload_file():
         except Exception as e:
             import traceback
             traceback.print_exc()
-            return jsonify({'error': str(e)})
+            
+        
+@analysis_bp.route('/api/get_current_analysis', methods=['GET'])
+def get_current_analysis():
+    """
+    API endpoint untuk mendapatkan data analisis saat ini dari session
+    """
+    # Check if there's analysis data in session
+    if 'analysis_file' not in session or 'analysis_context' not in session:
+        return jsonify({'error': 'No analysis data available'})
+    
+    # Get the analysis file path from session
+    file_path = session.get('analysis_file')
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({'error': 'Analysis file not found'})
+    
+    try:
+        # Read the analysis results from file
+        result_df = pd.read_csv(file_path)
+        
+        # Get stored context
+        analysis_context = session.get('analysis_context', {})
+        
+        # Extract hashtags
+        hashtag_counts = extract_hashtags(result_df)
+        
+        # Extract topics
+        topics = extract_topics(result_df)
+        
+        # Analyze sentiment per hashtag
+        hashtag_sentiment = analyze_sentiment_per_hashtag(result_df)
+        
+        # Get top users
+        top_users = get_top_users(result_df)
+        
+        # Extract words by sentiment
+        try:
+            sentiment_words = extract_words_by_sentiment(result_df)
+        except Exception as e:
+            print(f"Error in sentiment word extraction: {e}")
+            sentiment_words = {
+                'positive': [],
+                'neutral': [],
+                'negative': []
+            }
+        
+        # Create sentiment plot
+        sentiment_plot = create_sentiment_plot(result_df)
+        
+        # Create word cloud
+        try:
+            word_cloud = create_improved_word_cloud(result_df)
+        except Exception as e:
+            print(f"Error creating word cloud: {e}")
+            word_cloud = None
+        
+        # Prepare tweets for display
+        tweets_for_display = []
+        for _, row in result_df.iterrows():
+            tweet = {
+                'username': clean_for_json(row.get('username', '')),
+                'content': clean_for_json(row.get('content', '')),
+                'date': clean_for_json(row.get('date', '')),
+                'likes': clean_for_json(row.get('likes', 0)),
+                'retweets': clean_for_json(row.get('retweets', 0)),
+                'replies': clean_for_json(row.get('replies', 0)),
+                'predicted_sentiment': clean_for_json(row.get('predicted_sentiment', '')),
+                'confidence': clean_for_json(row.get('confidence', 0))
+            }
+            
+            # Add optional fields if they exist
+            for field in ['tweet_url', 'image_url', 'lang', 'location']:
+                if field in row and not pd.isna(row[field]):
+                    tweet[field] = clean_for_json(row[field])
+            
+            tweets_for_display.append(tweet)
+        
+        # Build full analysis results
+        analysis_results = {
+            'title': analysis_context.get('title', 'Analisis Sentimen X'),
+            'description': analysis_context.get('description', ''),
+            'total_tweets': analysis_context.get('total_tweets', 0),
+            'positive_count': analysis_context.get('positive_count', 0),
+            'neutral_count': analysis_context.get('neutral_count', 0),
+            'negative_count': analysis_context.get('negative_count', 0),
+            'positive_percent': analysis_context.get('positive_percent', 0),
+            'neutral_percent': analysis_context.get('neutral_percent', 0),
+            'negative_percent': analysis_context.get('negative_percent', 0),
+            'top_hashtags': [{'tag': tag, 'count': count} for tag, count in hashtag_counts.most_common(10)],
+            'topics': topics,
+            'hashtag_sentiment': hashtag_sentiment,
+            'top_users': top_users,
+            'sentiment_words': sentiment_words,
+            'sentiment_plot': sentiment_plot,
+            'word_cloud': word_cloud if word_cloud else None,
+            'tweets': tweets_for_display,
+            'saved_to_database': True  # Assume it's saved if we're loading from session
+        }
+        
+        return jsonify(analysis_results)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)})
 
 @analysis_bp.route('/filter_tweets', methods=['POST'])
 @login_required

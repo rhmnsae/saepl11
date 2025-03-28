@@ -156,7 +156,7 @@
                     
                     // Update URL
                     const newUrl = new URL(this.href);
-                    history.pushState({}, '', newUrl);
+                    history.pushState({tabId: tabId}, '', newUrl);
                     
                     // Update active state in navigation
                     tabLinks.forEach(l => l.classList.remove('active'));
@@ -173,12 +173,55 @@
                     if (targetContent) {
                         targetContent.classList.add('active');
                         targetContent.classList.remove('d-none');
+                        
+                        // Trigger custom event for tab change
+                        const tabChangeEvent = new CustomEvent('tabChanged', {
+                            detail: { tabId: tabId }
+                        });
+                        document.dispatchEvent(tabChangeEvent);
                     }
                 });
             });
             
-            // Handle the active tab based on the current view
+            // Handle popstate event (browser back/forward)
+            window.addEventListener('popstate', function(event) {
+                if (event.state && event.state.tabId) {
+                    const tabId = event.state.tabId;
+                    
+                    // Update active state in navigation
+                    tabLinks.forEach(l => {
+                        if (l.getAttribute('data-tab') === tabId) {
+                            l.classList.add('active');
+                        } else {
+                            l.classList.remove('active');
+                        }
+                    });
+                    
+                    // Show the corresponding section
+                    const mainTabContent = document.querySelectorAll('.main-tab-content');
+                    mainTabContent.forEach(content => {
+                        if (content.id === tabId) {
+                            content.classList.add('active');
+                            content.classList.remove('d-none');
+                        } else {
+                            content.classList.remove('active');
+                            content.classList.add('d-none');
+                        }
+                    });
+                    
+                    // Trigger custom event for tab change
+                    const tabChangeEvent = new CustomEvent('tabChanged', {
+                        detail: { tabId: tabId }
+                    });
+                    document.dispatchEvent(tabChangeEvent);
+                }
+            });
+            
+            // Add initial state
             const view = '{{ request.args.get("view", "input") }}';
+            history.replaceState({tabId: view}, '', window.location.href);
+            
+            // Handle the active tab based on the current view
             const mainTabContent = document.querySelectorAll('.main-tab-content');
             
             // Hide all content first
@@ -203,37 +246,18 @@
                 }
             }
             
-            // Save analysis button 
-            const saveAnalysisBtn = document.getElementById('save-analysis-btn');
-            if (saveAnalysisBtn) {
-                saveAnalysisBtn.addEventListener('click', function() {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = '{{ url_for("history.save_analysis") }}';
-                    
-                    // Add any additional data needed
-                    const originalFileInput = document.createElement('input');
-                    originalFileInput.type = 'hidden';
-                    originalFileInput.name = 'original_file';
-                    originalFileInput.value = '{{ session.get("original_file", "") }}';
-                    form.appendChild(originalFileInput);
-                    
-                    // Add sentiment plot if available
-                    const sentimentPlot = document.getElementById('sentiment-plot');
-                    if (sentimentPlot && sentimentPlot.src) {
-                        const sentimentPlotInput = document.createElement('input');
-                        sentimentPlotInput.type = 'hidden';
-                        sentimentPlotInput.name = 'sentiment_plot';
-                        sentimentPlotInput.value = sentimentPlot.src;
-                        form.appendChild(sentimentPlotInput);
-                    }
-                    
-                    document.body.appendChild(form);
-                    form.submit();
-                });
-            }
+            // Add warning before unload if analysis is in progress
+            window.addEventListener('beforeunload', function(e) {
+                const loadingElement = document.getElementById('loading');
+                if (loadingElement && !loadingElement.classList.contains('d-none')) {
+                    // Analisis sedang berlangsung, tampilkan peringatan
+                    e.preventDefault();
+                    e.returnValue = 'Analisis sentimen sedang berjalan. Apakah Anda yakin ingin meninggalkan halaman ini?';
+                    return e.returnValue;
+                }
+            });
         });
-    </script>
+        </script>
     
     {% block scripts %}{% endblock %}
 </body>

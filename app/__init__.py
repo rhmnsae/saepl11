@@ -27,8 +27,9 @@ def create_app(config_file=None):
     os.makedirs(app.config['SESSION_FILE_DIR'], exist_ok=True)
     os.makedirs(app.config['MODEL_FOLDER'], exist_ok=True)
     
-    # Setup session
-    Session(app)
+    # Setup session dengan konfigurasi keamanan yang lebih baik
+    session = Session()
+    session.init_app(app)
     
     # Initialize database
     db.init_app(app)
@@ -63,5 +64,18 @@ def create_app(config_file=None):
     # Create database tables
     with app.app_context():
         db.create_all()
+    
+    # Tambahkan error handler untuk sesi yang habis
+    @app.errorhandler(500)
+    def internal_server_error(e):
+        from flask import session, redirect, url_for, flash
+        # Cek apakah error disebabkan oleh sesi yang habis
+        if 'session expired' in str(e).lower():
+            # Reset session
+            session.clear()
+            flash('Sesi Anda telah habis. Silakan login kembali.', 'warning')
+            return redirect(url_for('auth.login'))
+        # Tampilkan halaman error default
+        return "Internal Server Error: " + str(e), 500
     
     return app

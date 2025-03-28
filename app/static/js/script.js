@@ -1168,7 +1168,158 @@ document.addEventListener('DOMContentLoaded', function() {
                 checkAnalysisDataLoaded();
             }, 1000);
         }
+
+        function loadAnalysisData() {
+            // Tampilkan indikator loading
+            const loadingDiv = document.createElement('div');
+            loadingDiv.id = 'analysis-loading';
+            loadingDiv.className = 'text-center my-4';
+            loadingDiv.innerHTML = `
+                <div class="spinner-border text-dark" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Memuat data analisis...</p>
+            `;
+            
+            // Tambahkan ke halaman jika kita berada di tab results
+            const resultsTab = document.getElementById('results');
+            if (resultsTab && resultsTab.classList.contains('active')) {
+                resultsTab.prepend(loadingDiv);
+            }
+            
+            // Kirim permintaan AJAX ke server
+            fetch('/api/get_current_analysis')
+                .then(response => response.json())
+                .then(data => {
+                    // Hapus indikator loading
+                    const loadingElement = document.getElementById('analysis-loading');
+                    if (loadingElement) loadingElement.remove();
+                    
+                    if (data.error) {
+                        showAlert('Error: ' + data.error, 'danger');
+                        return;
+                    }
+                    
+                    // Simpan data ke variabel global
+                    analysisResults = data;
+                    allTweets = data.tweets || [];
+                    
+                    // Update UI
+                    updateAnalysisResults(data);
+                    
+                    // Initialize pagination untuk tweet
+                    initializePagination();
+                    
+                    // Generate topik untuk chatbot
+                    generateTopics(data);
+                    
+                    // Buat word cloud
+                    createImprovedWordCloud(data);
+                    
+                    console.log('Analysis data loaded successfully');
+                })
+                .catch(error => {
+                    // Hapus indikator loading
+                    const loadingElement = document.getElementById('analysis-loading');
+                    if (loadingElement) loadingElement.remove();
+                    
+                    console.error('Error fetching analysis data:', error);
+                    showAlert('Gagal memuat data analisis. Silakan refresh halaman atau lakukan analisis baru.', 'danger');
+                });
+        }
+        
+        // Fungsi untuk memeriksa apakah data analisis perlu dimuat
+        function checkAndLoadAnalysisData() {
+            // Cek apakah kita berada di tab hasil atau evaluasi
+            const resultsTab = document.getElementById('results');
+            const evaluationTab = document.getElementById('evaluation');
+            
+            if ((resultsTab && resultsTab.classList.contains('active')) || 
+                (evaluationTab && evaluationTab.classList.contains('active'))) {
+                
+                // Cek apakah data analisis sudah ada
+                if (!analysisResults || !allTweets || allTweets.length === 0) {
+                    loadAnalysisData();
+                }
+            }
+        }
+        
+        // Cek data analisis saat halaman dimuat
+        checkAndLoadAnalysisData();
+        
+        // Tambahkan event listener untuk tab navigation
+        const navLinks = document.querySelectorAll('.main-tab-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                // Skip jika tab dinonaktifkan
+                if (this.classList.contains('disabled')) {
+                    return;
+                }
+                
+                // Get target tab ID
+                const targetId = this.getAttribute('data-tab');
+                
+                // Jika tab results atau evaluation yang aktif, cek data analisis
+                if (targetId === 'results' || targetId === 'evaluation') {
+                    setTimeout(checkAndLoadAnalysisData, 100);
+                }
+            });
+        });
+    
+        // Tambahkan handler untuk hashchange dan popstate events
+        window.addEventListener('hashchange', checkAndLoadAnalysisData);
+        window.addEventListener('popstate', checkAndLoadAnalysisData);
+        
+        // Fungsi untuk memeriksa apakah data analisis valid
+        function checkAnalysisDataLoaded() {
+            // Cek apakah data tweets tersedia
+            if (!allTweets || allTweets.length === 0) {
+                if (document.getElementById('results').classList.contains('active') || 
+                    document.getElementById('evaluation').classList.contains('active')) {
+                    loadAnalysisData();
+                }
+                return false;
+            }
+            
+            // Cek keberadaan elemen-elemen kunci di hasil analisis
+            const titleElement = document.getElementById('title-placeholder');
+            const totalTweetsElement = document.getElementById('total-tweets');
+            
+            if ((!titleElement || !titleElement.textContent) || 
+                (!totalTweetsElement || totalTweetsElement.textContent === '0')) {
+                loadAnalysisData();
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // Cek data setelah beberapa detik (untuk memastikan DOM sudah selesai dirender)
+        setTimeout(checkAnalysisDataLoaded, 500);
+        
+        // Simpan referensi ke fungsi asli updateAnalysisResults
+        const originalUpdateAnalysisResults = window.updateAnalysisResults;
+        
+        // Override fungsi updateAnalysisResults untuk mencegah kehilangan data
+        window.updateAnalysisResults = function(data) {
+            // Panggil fungsi asli
+            if (originalUpdateAnalysisResults) {
+                originalUpdateAnalysisResults(data);
+            }
+            
+            // Simpan data ke sessionStorage sebagai backup
+            try {
+                // Simpan hanya data penting tanpa tweets (untuk menghemat ruang)
+                const storageData = {...data};
+                delete storageData.tweets;
+                sessionStorage.setItem('analysisData', JSON.stringify(storageData));
+            } catch (e) {
+                console.warn('Failed to save analysis data to sessionStorage:', e);
+            }
+        };
     });
+    
+
     
     // Function to create sentiment by hashtag chart
     function createSentimentByHashtagChart(hashtagSentimentData) {
