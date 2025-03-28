@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from flask import Blueprint, current_app, flash, redirect, request, jsonify, send_file, session, url_for
+from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.services.sentiment_analysis import predict_sentiments, extract_hashtags, extract_topics
 from app.services.sentiment_analysis import analyze_sentiment_per_hashtag, get_top_users, extract_words_by_sentiment
@@ -27,6 +28,7 @@ def clean_for_json(value):
     return value
 
 @analysis_bp.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     # Verifikasi model terlatih ada
     if not os.path.exists(current_app.config['MODEL_PATH']):
@@ -57,6 +59,7 @@ def upload_file():
             
             # Simpan ONLY THE PATH to the analysis file in session, not the entire results
             session['analysis_file'] = output_file
+            session['original_file'] = file_path
             
             # Hitung statistik
             sentiment_counts = result_df['predicted_sentiment'].value_counts()
@@ -173,6 +176,7 @@ def upload_file():
             return jsonify({'error': str(e)})
 
 @analysis_bp.route('/filter_tweets', methods=['POST'])
+@login_required
 def filter_tweets():
     data = request.json
     sentiment_filter = data.get('sentiment', 'all')
@@ -213,6 +217,7 @@ def filter_tweets():
     return jsonify({'tweets': tweets_for_display})
 
 @analysis_bp.route('/download_report', methods=['GET'])
+@login_required
 def download_report():
     # Cek apakah ada data analisis di session
     if 'analysis_file' not in session or 'analysis_context' not in session:

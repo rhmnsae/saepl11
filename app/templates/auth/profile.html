@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Profil - Analisis Sentimen X{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <h2 class="card-title">Profil Pengguna</h2>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Informasi Profil</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Username:</strong> {{ current_user.username }}</p>
+                        <p><strong>Email:</strong> {{ current_user.email }}</p>
+                        <p><strong>Bergabung Sejak:</strong> {{ current_user.created_at.strftime('%d %B %Y') }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Statistik Akun</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Total Analisis:</strong> {{ current_user.histories.count() }}</p>
+                        <p><strong>Analisis Terakhir:</strong> 
+                            {% if current_user.histories.order_by(models.AnalysisHistory.created_at.desc()).first() %}
+                                {{ current_user.histories.order_by(models.AnalysisHistory.created_at.desc()).first().created_at.strftime('%d %B %Y, %H:%M') }}
+                            {% else %}
+                                Belum ada analisis
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-flex mt-3">
+            <a href="{{ url_for('history.index') }}" class="btn btn-primary me-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path></svg>
+                Lihat Riwayat Analisis
+            </a>
+            <a href="{{ url_for('main.index') }}" class="btn btn-dark">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                Kembali ke Beranda
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
